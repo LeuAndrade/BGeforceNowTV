@@ -15,7 +15,8 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v3
+      - name: Usar Android SDK preinstalado
+        run: echo "ANDROID_HOME=$ANDROID_HOME"
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
