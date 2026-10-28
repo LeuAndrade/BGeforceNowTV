@@ -1,0 +1,31 @@
+<resources>
+    <style name="AppTheme" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:colorButtonNormal">#1A2330</item>
+        <item name="android:colorControlHighlight">#33577CA8</item>
+        <item name="android:alertDialogTheme">@style/TvDialog</item>
+        <item name="android:colorBackground">#101721</item>
+        <item name="android:textColorPrimary">#F1F5F8</item>
+        <item name="android:textColorSecondary">#A6B1C2</item>
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowBackground">#070A0E</item>
+        <item name="android:colorAccent">#AECDFF</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="android:navigationBarColor">#070A0E</item>
+        <item name="android:statusBarColor">#070A0E</item>
+    </style>
+    <style name="TvDialog" parent="android:style/Theme.Material.Dialog.Alert">
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:windowBackground">@drawable/dialog_panel</item>
+        <item name="android:colorBackground">#121A25</item>
+        <item name="android:colorAccent">#AECDFF</item>
+        <item name="android:textColorPrimary">#F1F5F8</item>
+        <item name="android:textColorSecondary">#A6B1C2</item>
+        <item name="android:windowMinWidthMajor">62%</item>
+        <item name="android:windowElevation">8dp</item>
+    </style>
+</resources>

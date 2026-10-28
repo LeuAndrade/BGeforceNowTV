@@ -1,0 +1,47 @@
+name: APK principal com sua assinatura
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: SDK
+        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - name: Restaurar assinatura privada
+        env:
+          BGFN_KEYSTORE_B64: ${{ secrets.BGFN_KEYSTORE_B64 }}
+        run: |
+          test -n "$BGFN_KEYSTORE_B64" || { echo 'Configure a assinatura conforme docs/GITHUB_PASSO_A_PASSO.md'; exit 1; }
+          printf '%s' "$BGFN_KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/bgfn.jks"
+      - name: Testar e gerar APK principal
+        env:
+          BGFN_KEYSTORE: ${{ runner.temp }}/bgfn.jks
+          BGFN_STORE_PASSWORD: ${{ secrets.BGFN_STORE_PASSWORD }}
+          BGFN_KEY_ALIAS: bgfn
+          BGFN_KEY_PASSWORD: ${{ secrets.BGFN_STORE_PASSWORD }}
+        run: |
+          node scripts/check-player.mjs
+          gradle --no-daemon testDebugUnitTest lintDebug assembleRelease
+      - name: Verificar assinatura, pacote e integridade dos APKs
+        run: python3 scripts/verify-apks.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BGeforce-Now-TV-principal
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 30
+      - name: Limpar chave temporária
+        if: always()
+        run: rm -f "$RUNNER_TEMP/bgfn.jks"

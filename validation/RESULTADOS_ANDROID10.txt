@@ -1,0 +1,59 @@
+HISTÓRICO DA VERSÃO 0.14 — não repetido com a 0.15.
+
+BGeforce Now TV 0.14.0. API29 AOSP x86_64, software-emulated GPU/CPU. No authenticated GFN session, hardware decode or physical controller benchmark.
+
+The initial setup hit PackageManager-not-ready; it was repeated after boot. The first visual run was blocked by an emulator System UI ANR. After waking/dismissing it and using Instrumentation event permissions, the same production APK passed the complete TV UI run. The AndroidRuntime buffer below includes earlier system-service failures; it is not an empty crash log. No FATAL in that excerpt explicitly identifies the app package.
+
+06-v13-package-again
+    userId=10117
+    primaryCpuAbi=x86_64
+    versionCode=13 minSdk=23 targetSdk=35
+    versionName=0.13.0
+
+12-seed-on-v13-again
+INSTRUMENTATION_RESULT: checks=1
+INSTRUMENTATION_RESULT: result=seed saved
+INSTRUMENTATION_CODE: -1
+
+20-update-v14
+Performing Push Install
+Success
+
+21-stream-smoke-v14
+INSTRUMENTATION_RESULT: checks=25
+INSTRUMENTATION_RESULT: result=release UI/input/update smoke passed; fake media, no gameplay benchmark
+INSTRUMENTATION_CODE: -1
+
+22-package-v14
+    userId=10117
+    primaryCpuAbi=x86_64
+    versionCode=14 minSdk=23 targetSdk=35
+    versionName=0.14.0
+
+42-ui-smoke-v2
+INSTRUMENTATION_RESULT: checks=20
+INSTRUMENTATION_RESULT: result=TV UI checks passed; local synthetic metadata/art, no live account or streaming benchmark
+INSTRUMENTATION_CODE: -1
+
+50-final-package
+    userId=10117
+    primaryCpuAbi=x86_64
+    versionCode=14 minSdk=23 targetSdk=35
+    versionName=0.14.0
+
+51-app-crashes
+--------- beginning of main
+--------- beginning of system
+--------- beginning of crash
+E/AndroidRuntime( 2240): FATAL EXCEPTION: SysUiBg
+E/AndroidRuntime( 2240): Process: com.android.systemui, PID: 2240
+E/AndroidRuntime( 2240): DeadSystemException: The system died; earlier logs will point to the root cause
+E/AndroidRuntime( 2542): FATAL EXCEPTION: CellBroadcastHandler
+E/AndroidRuntime( 2542): Process: com.android.phone, PID: 2542
+E/AndroidRuntime( 2542): DeadSystemException: The system died; earlier logs will point to the root cause
+E/AndroidRuntime( 2834): FATAL EXCEPTION: main
+E/AndroidRuntime( 2834): PID: 2834
+E/AndroidRuntime( 2834): DeadSystemException: The system died; earlier logs will point to the root cause
+E/AndroidRuntime( 2258): FATAL EXCEPTION: RoleControllerService
+E/AndroidRuntime( 2258): Process: com.android.permissioncontroller, PID: 2258
+E/AndroidRuntime( 2258): DeadSystemException: The system died; earlier logs will point to the root cause

@@ -1,0 +1,16 @@
+BGeforce Now TV 0.13.0; controlled activity regression, not physical FPS.
+Before (0.12):
+Baseline 0.12, production dispatchKeyEvent/sendPad, controlled 10000 unchanged button-down events.
+10000 repeated button events: controller_posts=10000 device_queries=10000
+Expected one scheduling operation; baseline verification failed as expected. This is not a hardware/FPS measurement.
+
+After (0.13), real dispatchKeyEvent/sendPad, controlled clock/media:
+10000 repeated button events: controller_posts=1 device_queries=0
+One packet for the state in each version in this controlled batch. Press/release and combinations are separately checked.
+
+Standalone JVM allocation, Corretto17.0.21/Linux x86_64, warmup=200000, measured=250000:
+Before:
+wire_fixture=OK packets=250000 allocated_bytes=32000000 bytes_per_packet=128.0
+After:
+wire_fixture=OK packets=250000 allocated_bytes=18000000 bytes_per_packet=72.0
+Reduction 43.75% per encoded gamepad packet in this JVM test; not Android ART, total RAM, FPS or decode performance.

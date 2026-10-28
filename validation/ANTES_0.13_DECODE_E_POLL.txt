@@ -1,0 +1,8 @@
+Original 0.13 source extracted from the previous delivered source ZIP. Only ActivePollContinuityTest and DirectDecoderInputTest from the new revision were added. Gradle ran those two test classes (5 tests).
+
+Expected regression result before fixing: 5 tests, 3 failures.
+- repeated500DoesNotTearDownAnActiveVideoTransport: error() was called by the old polling policy.
+- missingSessionIsReportedWithoutAPollingLoop: old policy deferred the 404.
+- readyInputCopiesIntoCodecWithoutAnIntermediateEncodedBuffer: old path populated the intermediate buffer pool (1 rather than 0).
+
+The waiting-frame ownership test and bounded queue-error test passed in the old source. Current results are in RESULTADOS_JUNIT.txt. These are controlled tests, not a GFN service outage reproduction, Android hardware benchmark, or FPS/decode measurement.

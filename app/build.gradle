@@ -1,0 +1,70 @@
+plugins { id 'com.android.application' }
+android {
+    namespace 'com.bgeforce.tv'
+    compileSdk 35
+    buildToolsVersion '35.0.0'
+    buildFeatures { buildConfig true }
+    defaultConfig {
+        // A new main package can install beside the previous preview with its different signing key.
+        applicationId providers.gradleProperty('bgfnApplicationId').getOrElse('com.bgeforce.tv.main')
+        manifestPlaceholders = [appLabel: 'BGeforce Now TV']
+        minSdk 23
+        targetSdk 35
+        versionCode 15
+        versionName '0.15.0'
+        ndk { abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86_64' }
+    }
+    signingConfigs {
+        release {
+            // Standalone APKs, including old TV installers. Keep the existing certificate.
+            enableV1Signing true
+            enableV2Signing true
+            enableV3Signing false
+            enableV4Signing false
+            if (System.getenv('BGFN_KEYSTORE')) {
+                storeFile file(System.getenv('BGFN_KEYSTORE'))
+                storePassword System.getenv('BGFN_STORE_PASSWORD')
+                keyAlias System.getenv('BGFN_KEY_ALIAS')
+                keyPassword System.getenv('BGFN_KEY_PASSWORD')
+            }
+        }
+    }
+    buildTypes {
+        debug {
+            applicationIdSuffix '.dev'
+            manifestPlaceholders = [appLabel: 'BGeforce Now TV Dev']
+        }
+        release {
+            // Keep this recovery build close to the known working unminified 0.5.
+            // Re-enable only after release gameplay has been checked on a TV.
+            minifyEnabled false
+            shrinkResources false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (System.getenv('BGFN_KEYSTORE')) signingConfig signingConfigs.release
+        }
+    }
+    splits { abi { enable true; reset(); include 'armeabi-v7a', 'arm64-v8a', 'x86_64'; universalApk true } }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+    testOptions { unitTests.returnDefaultValues = true }
+    lint { abortOnError true; checkReleaseBuilds true }
+}
+dependencies {
+    implementation 'androidx.recyclerview:recyclerview:1.3.2'
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    implementation 'com.google.zxing:core:3.5.3'
+    implementation 'io.github.webrtc-sdk:android:144.7559.14'
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.json:json:20240303'
+    testImplementation 'org.mockito:mockito-core:5.14.2'
+    testImplementation 'com.squareup.okhttp3:mockwebserver:4.12.0'
+    testImplementation 'com.squareup.okhttp3:okhttp-tls:4.12.0'
+}
+
+// Load the test agent at JVM startup; no runtime self-attachment is needed.
+// This agent is a test dependency only and is never packaged in the APK.
+tasks.withType(Test).configureEach {
+    doFirst {
+        def agent = classpath.files.find { it.name == 'mockito-core-5.14.2.jar' }
+        if (agent != null) jvmArgs "-javaagent:${agent.absolutePath}"
+    }
+}

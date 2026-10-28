@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; media-src blob: mediastream:; img-src 'none'"><title>BGFN RTC</title>
+<style>html,body{margin:0;width:100%;height:100%;background:#000;overflow:hidden}video{width:100%;height:100%;object-fit:contain}</style>
+<video id="video" autoplay playsinline></video>
+<script>
+'use strict';
+let pc,reliable,micStream,remoteReady=false,pending=[],first=false,lastStats=null,statsEpoch=0,timer,statsEnabled=false,sampling=false,inputTimer,queuedBytes=0,queuedInput=[];
+const video=document.getElementById('video');
+video.addEventListener('resize',()=>{if(video.videoWidth>0&&video.videoHeight>0)BGFN.videoSize(video.videoWidth,video.videoHeight)});
+const fail=e=>BGFN.error(e&&e.message?e.message:String(e));
+async function init(config){try{
+ if(!window.RTCPeerConnection)throw Error('This Android System WebView has no WebRTC support');
+ pc=new RTCPeerConnection({iceServers:config.iceServers.length?config.iceServers:[{urls:'stun:s1.stun.gamestream.nvidia.com:19308'}],bundlePolicy:'max-bundle'});
+ pc.onicecandidate=e=>{if(e.candidate)BGFN.candidate(JSON.stringify(e.candidate.toJSON()))};
+ const stream=new MediaStream();video.srcObject=stream;
+ pc.ontrack=e=>{stream.addTrack(e.track);video.play().catch(fail)};
+ const firstFrame=()=>{if(!first){first=true;BGFN.firstFrame()}};
+ if(video.requestVideoFrameCallback)video.requestVideoFrameCallback(firstFrame);else video.addEventListener('loadeddata',()=>{if(video.videoWidth>0)firstFrame()});
+ pc.onconnectionstatechange=()=>{if(pc.connectionState==='failed')fail('WebRTC connection failed')};
+ pc.ondatachannel=e=>{if(e.channel.label==='input_channel_v1')reliable=e.channel};
+ if(config.microphone)micStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true},video:false});
+ statistics(!!config.statistics);BGFN.ready();
+}catch(e){fail(e)}}
+async function offer(sdp,kbps){try{
+ reliable=pc.createDataChannel('input_channel_v1',{ordered:true});
+ pc.createDataChannel('input_channel_partially_reliable',{ordered:false,maxPacketLifeTime:30});
+ pc.createDataChannel('stats_channel',{ordered:false,maxRetransmits:0});
+ await pc.setRemoteDescription({type:'offer',sdp});remoteReady=true;
+ for(const c of pending)await pc.addIceCandidate(c);pending=[];
+ if(micStream){const track=micStream.getAudioTracks()[0];const transceivers=pc.getTransceivers().filter(t=>t.receiver.track.kind==='audio');const mic=transceivers.find(t=>t.mid==='3')||transceivers.find(t=>t.direction==='sendonly')||transceivers[transceivers.length-1];if(mic){await mic.sender.replaceTrack(track);if(mic.direction==='recvonly')mic.direction='sendrecv';else if(mic.direction==='inactive')mic.direction='sendonly'}else pc.addTrack(track,micStream)}
+ let answer=await pc.createAnswer();answer.sdp=answer.sdp.replace(/(m=video[^\r\n]+\r\n)/,'$1b=AS:'+kbps+'\r\n');
+ await pc.setLocalDescription(answer);BGFN.answer(pc.localDescription.sdp);
+}catch(e){fail(e)}}
+async function ice(c){try{if(remoteReady)await pc.addIceCandidate(c);else if(pending.length<128)pending.push(c)}catch(e){fail(e)}}
+function input(base64){inputs([base64])}
+function inputs(batch){for(const base64 of batch){const s=atob(base64),b=new Uint8Array(s.length);for(let i=0;i<s.length;i++)b[i]=s.charCodeAt(i);if(queuedInput.length>=128||queuedBytes+b.length>65536){fail('Control input queue is full');break}queuedInput.push(b);queuedBytes+=b.length}drainInputs()}
+function drainInputs(){clearTimeout(inputTimer);if(reliable&&reliable.readyState==='open'){while(queuedInput.length&&reliable.bufferedAmount<32768){const b=queuedInput.shift();queuedBytes-=b.length;reliable.send(b)}}if(queuedInput.length)inputTimer=setTimeout(drainInputs,50)}
+function statistics(enabled){clearInterval(timer);statsEnabled=enabled;lastStats=null;statsEpoch++;if(enabled)timer=setInterval(sample,2000)}
+function mute(muted){if(micStream)for(const t of micStream.getAudioTracks())t.enabled=!muted}
+function audio(enabled){video.muted=!enabled}
+// Unknown measurements stay unknown; counter/clock resets must not produce NaN or Infinity.
+function measured(value){return typeof value==='number'&&Number.isFinite(value)&&value>=0?value:-1}
+function difference(value,previous){return value<0||previous<0||value<previous?-1:measured(value-previous)}
+function streamMetrics(inbound,pair,codec,now){
+ const id=inbound.id||'',bytes=measured(inbound.bytesReceived),frames=measured(inbound.framesDecoded),decode=measured(inbound.totalDecodeTime);
+ const same=lastStats&&lastStats.id===id&&now>lastStats.time,elapsed=same?now-lastStats.time:-1;
+ const byteDelta=same?difference(bytes,lastStats.bytes):-1,frameDelta=same?difference(frames,lastStats.frames):-1,decodeDelta=same?difference(decode,lastStats.decode):-1;
+ let fps=measured(inbound.framesPerSecond);if(fps<0&&frameDelta>=0)fps=measured(frameDelta*1000/elapsed);
+ const mbps=byteDelta<0?-1:measured(byteDelta*.008/elapsed),decodeMs=frameDelta>0&&decodeDelta>=0?measured(decodeDelta*1000/frameDelta):-1;
+ lastStats={id,bytes,frames,decode,time:now};
+ const rtt=pair?measured(pair.currentRoundTripTime):-1;
+ return {fps,width:Math.max(0,measured(inbound.frameWidth||video.videoWidth)),height:Math.max(0,measured(inbound.frameHeight||video.videoHeight)),mbps,decodeMs,dropped:Math.max(0,measured(inbound.framesDropped)),codec:codec?codec.mimeType:'',decoder:inbound.decoderImplementation||'WebView',ping:rtt<0?-1:measured(rtt*1000)};
+}
+async function sample(){
+ if(!statsEnabled||sampling||!pc||pc.connectionState==='closed')return;
+ sampling=true;const epoch=statsEpoch;
+ try{
+  const report=await pc.getStats();if(!statsEnabled||epoch!==statsEpoch)return;
+  let inbound,pair;report.forEach(s=>{if(s.type==='inbound-rtp'&&s.kind==='video')inbound=s;if(s.type==='candidate-pair'&&s.nominated&&s.state==='succeeded')pair=s});
+  if(inbound)BGFN.stats(JSON.stringify(streamMetrics(inbound,pair,report.get(inbound.codecId),performance.now())));
+ }catch(e){/* Statistics are optional: an unavailable sample must not end media playback. */}
+ finally{sampling=false}
+}
+window.addEventListener('pagehide',()=>{statsEnabled=false;statsEpoch++;clearInterval(timer);clearTimeout(inputTimer);queuedInput=[];queuedBytes=0;if(micStream)for(const t of micStream.getTracks())t.stop();if(pc)pc.close()});
+</script></html>

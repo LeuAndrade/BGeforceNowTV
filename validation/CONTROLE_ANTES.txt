@@ -1,0 +1,3 @@
+Baseline 0.12, production dispatchKeyEvent/sendPad, controlled 10000 unchanged button-down events.
+10000 repeated button events: controller_posts=10000 device_queries=10000
+Expected one scheduling operation; baseline verification failed as expected. This is not a hardware/FPS measurement.

@@ -1,0 +1,6 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.bgeforce.tv.validation">
+  <uses-sdk android:minSdkVersion="23" android:targetSdkVersion="35" />
+  <instrumentation android:name="com.bgeforce.tv.validation.Smoke" android:targetPackage="com.bgeforce.tv.main" android:functionalTest="true" />
+  <instrumentation android:name="com.bgeforce.tv.validation.TvUiSmoke" android:targetPackage="com.bgeforce.tv.main" android:functionalTest="true" />
+  <application android:label="BGFN validation only" android:hasCode="true" />
+</manifest>

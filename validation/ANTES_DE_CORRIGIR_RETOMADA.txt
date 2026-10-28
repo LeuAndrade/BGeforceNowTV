@@ -1,0 +1,5 @@
+Production activity launch/ready regression against unchanged 0.11 production code.
+ResumeSignalingRegressionTest.aClaimedSessionStillStartsWithAFreshWebRtcHandshake
+Before: 1 test, 1 failure. AssertionError: expected <[false]> but was <[true]>.
+After: same test passes in the complete 197-test suite.
+This reproduces the transport-state bug, not an authenticated GFN server failure.

@@ -1,0 +1,3 @@
+Fonte 0.14 + QueueTransitionTest e QueueProgress da correção, sem alterar SessionClient.
+8 testes executados, 4 falhas esperadas: prioridade do progresso, prioridade de zero, tratamento de nulo/inválido e bloqueio de prontidão durante seatSetupStep=1.
+Os mesmos 8 passam na 0.15. Não é uma partida real.

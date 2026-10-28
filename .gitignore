@@ -1,0 +1,15 @@
+.gradle/
+**/build/
+local.properties
+*.jks
+*.keystore
+*.apk
+*.apks
+.idea/
+captures/
+dist/
+__pycache__/
+
+# Private signing material is delivered separately, never in the repository.
+*assinatura-privada*
+assinatura.json
