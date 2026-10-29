@@ -7,7 +7,7 @@ permissions:
   contents: read
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -15,12 +15,48 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v3
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
-      - name: SDK
-        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - name: Preparar SDK do runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          if [[ ! -d "$sdk" ]]; then
+            echo '::error::SDK do runner ausente. Use runs-on: ubuntu-24.04.'
+            exit 1
+          fi
+          printf 'ANDROID_HOME=%s\nANDROID_SDK_ROOT=%s\n' "$sdk" "$sdk" >> "$GITHUB_ENV"
+          printf '%s\n' "$sdk/build-tools/35.0.0" "$sdk/platform-tools" >> "$GITHUB_PATH"
+          missing=()
+          if [[ ! -f "$sdk/platforms/android-35/android.jar" || ! -f "$sdk/platforms/android-35/core-for-system-modules.jar" ]]; then
+            missing+=('platforms;android-35')
+          fi
+          if [[ ! -x "$sdk/build-tools/35.0.0/aapt" || ! -x "$sdk/build-tools/35.0.0/zipalign" || ! -x "$sdk/build-tools/35.0.0/apksigner" || ! -f "$sdk/build-tools/35.0.0/lib/d8.jar" ]]; then
+            missing+=('build-tools;35.0.0')
+          fi
+          if (( ${#missing[@]} > 0 )); then
+            manager="$sdk/cmdline-tools/latest/bin/sdkmanager"
+            if [[ ! -x "$manager" ]]; then
+              manager="$(command -v sdkmanager || true)"
+            fi
+            if [[ ! -x "$manager" ]]; then
+              echo '::error::sdkmanager ausente no runner. Use runs-on: ubuntu-24.04.'
+              exit 1
+            fi
+            printf 'Instalando componente necessario: %s\n' "${missing[@]}"
+            "$manager" --sdk_root="$sdk" --install "${missing[@]}" < <(printf 'y\n%.0s' {1..100})
+          else
+            echo 'SDK 35 e Build Tools 35.0.0 ja disponiveis; nenhuma reinstalacao necessaria.'
+          fi
+          test -f "$sdk/platforms/android-35/android.jar"
+          test -f "$sdk/platforms/android-35/core-for-system-modules.jar"
+          test -x "$sdk/build-tools/35.0.0/aapt"
+          test -x "$sdk/build-tools/35.0.0/zipalign"
+          test -x "$sdk/build-tools/35.0.0/apksigner"
+          test -f "$sdk/build-tools/35.0.0/lib/d8.jar"
+          echo 'SDK pronto para compilar e verificar os APKs.'
       - name: Testar e compilar
         run: |
           node scripts/check-player.mjs
