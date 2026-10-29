@@ -1,11 +1,9 @@
-# Verificação da versão 0.15.0
+# Verificação — BGeforce Now TV 0.19.0
 
-## Verificação e limites
+303 testes Java aprovados; zero falhas, erros ou ignorados. 59 verificações JavaScript aprovadas. Lint: zero erros e 31 avisos. Build release concluído. Quatro APKs standalone (ARMv7, ARM64, Universal, x86_64) verificados: pacote com.bgeforce.tv.main, versão 19/0.19.0, mesma assinatura principal v1/v2, ABIs, alinhamento, DEX e integridade ZIP.
 
-258 testes JUnit passaram (242 anteriores + 16 novos), incluindo trocas de rota com HTTP controlado e sinalização WebSocket sobre TLS validado. 59 verificações JavaScript passaram. Lint: zero erros e 31 avisos. APKs release ARMv7, ARM64, x86_64 e universal têm pacote/assinatura principal preservados e passam no verificador de assinatura v1/v2, alinhamento, manifesto, DEX, ABIs e integridade ZIP.
+SecureChannel19RegressionTest reproduz quatro falhas na fonte entregue da 0.18: porta do protocolo seguro 5, separação de mídia UDP, prioridade do canal seguro e classe de alocação do renderer Native. O log em validation/ANTES_0.18_CANAL_SEGURO.txt registra essas falhas esperadas. Os mesmos cenários passam na 0.19. As expectativas antigas do contrato NVIDIA foram atualizadas para BROWSER/WEBRTC; o contrato de parceiros permanece NATIVE/NVIDIA-CLASSIC.
 
-A regressão da leitura/prontidão foi reproduzida na fonte 0.14 com o novo teste de contrato e apenas a classe de filtro adicionados: 8 testes, 4 falhas esperadas; os mesmos 8 passam na 0.15. O teste de socket silencioso usa um prazo reduzido somente no construtor de ensaio, para verificar o caminho real de timeout sem aguardar 12 s em cada conexão.
+A fixture SignalingV3RegressionTest usa o descritor protocolo 5 para obter a URL e realiza TLS/WebSocket, atribuição/ACK, oferta e resposta roteada sintéticos. ProviderIdentity19Test verifica uma única mutação de retomada e a identidade NVIDIA em outro domínio de controlador. A privacidade do histórico também é verificada. Isso não é uma partida real nem uma conta autenticada.
 
-Não houve partida autenticada nem acesso remoto à TV do usuário nesta revisão. As 25 verificações Android de player/entrada e 20 de interface registradas na pasta validation são históricas da 0.14, não execuções da 0.15. Não há benchmark físico de decode/FPS nem garantia de ausência de toda falha do servidor.
-
-Referência técnica consultada: protocolo de sessões/sinalização do projeto OpenNOW e Opennow-web (fontes preservadas da pesquisa anterior). As correções de fila, confirmação de aumento e gestão da passagem de endpoint neste projeto são próprias.
+Bibliotecas nativas, asset WebView e arquivos centrais de mídia/decoder/controles/Settings são idênticos aos da 0.18, conforme PIPELINE_PRESERVADO_0.19.json. Não houve teste físico na TV, medição de FPS/decode ou validação autenticada de GFN nesta revisão. Não se afirma que todos os erros do serviço foram eliminados. Veja FILA_E_INICIO.md.

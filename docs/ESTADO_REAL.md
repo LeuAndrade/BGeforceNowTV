@@ -1,7 +1,5 @@
-# Estado real da versão 0.15.0
+# Estado real — 0.19.0
 
-Corrige leitura e confirmação da posição da fila, espera em zero, consulta ao nó atribuído antes do player, manutenção da rota de leitura, mudança limitada do endpoint antes do SDP e prazo finito para WebSocket aberto sem oferta. Não altera a qualidade/decoder padrão nem o envio de controles da 0.14.
+Corrigidos porta/prioridade do canal seguro protocolo 5, separação entre sinalização TLS e fallback de mídia UDP, seleção da alocação WebRTC da NVIDIA para ambos os motores locais e identidade do provedor durante retomada. Ampliado o histórico de Copiar erro sem incluir corpos/tokens. Native permanece WebRTC Android + MediaCodec, com o mesmo decoder e configurações de vídeo.
 
-258 JUnit e 59 verificações JS passaram; lint sem erros (31 avisos). A regressão de fila/prontidão reproduziu quatro falhas na fonte 0.14 e passa na 0.15. APKs release gerados e assinatura/pacote/ABI/DEX/alinhamento/ZIP verificados. Não houve execução autenticada em TV física, medição de FPS/decode ou novo ensaio Android nesta revisão. Ensaios Android 0.14 em validation são históricos. Não há garantia de que todo erro do provedor desapareça.
-
-Veja FILA_E_INICIO.md para detalhes e instalação. O padrão continua 720p60/H.264/8 Mbps/Compatível; Full HD opcional permanece.
+Não houve partida autenticada, teste físico na TV ou medição de FPS/decode nesta revisão. A imagem localiza a falha antes da oferta SDP, mas não contém os descritores nem todos os pacotes da sessão real. Leia FILA_E_INICIO.md e VERIFICACAO.md para evidência, testes e limites.

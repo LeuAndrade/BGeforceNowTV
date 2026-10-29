@@ -1,0 +1,23 @@
+[
+  {
+    "path": "android/app/src/main/java/com/opencloudgaming/opennow/GfnApi.kt",
+    "url": "https://github.com/OpenCloudGaming/OpenNOW/blob/1bea55a39c23d66780b9aedd85a5d967173d58d6/android/app/src/main/java/com/opencloudgaming/opennow/GfnApi.kt",
+    "sha256": "5d131bf77578392d8340f59b2b5178c7b168b0c43e2ba4c560eb10a90da11b19"
+  },
+  {
+    "path": "android/app/src/main/java/com/opencloudgaming/opennow/GfnSessionConnections.kt",
+    "url": "https://github.com/OpenCloudGaming/OpenNOW/blob/1bea55a39c23d66780b9aedd85a5d967173d58d6/android/app/src/main/java/com/opencloudgaming/opennow/GfnSessionConnections.kt",
+    "sha256": "1eb91d34da5f1679775dc77a120bbddf6310055e0bf45015fd77198458267a2b"
+  },
+  {
+    "path": "android/app/src/main/java/com/opencloudgaming/opennow/StreamSignaling.kt",
+    "url": "https://github.com/OpenCloudGaming/OpenNOW/blob/1bea55a39c23d66780b9aedd85a5d967173d58d6/android/app/src/main/java/com/opencloudgaming/opennow/StreamSignaling.kt",
+    "sha256": "7cacfb6747946288c4085cf524f68f6ea1c065d8392af4e354da49df0996ea7a"
+  },
+  {
+    "url": "https://play.geforcenow.com/mall/vendor.67f3eddbbf4416ca.js",
+    "sha256": "f175c303fb44476f15a3f75eb6bb5438ef93e4f9c50c29067002c447fd6ae3e1",
+    "bytes": 3063057,
+    "redistributed": false
+  }
+]

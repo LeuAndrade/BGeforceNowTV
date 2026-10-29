@@ -1,0 +1,63 @@
+{
+  "commit": "a49b124ce31e87113fd4961f6a321fbf0ad1fdc5",
+  "sources": [
+    {
+      "path": "native/opennow-streamer/crates/opennow-streamer-core/src/webrtc/signaling.rs",
+      "file": "native__opennow-streamer__crates__opennow-streamer-core__src__webrtc__signaling.rs",
+      "bytes": 18013,
+      "sha256": "f229ff6ede9f4c62d8bbf01a0159f1f6a29de5d0c12e080b554fbc7314805b37",
+      "git_blob": "6deda56cbfaada7c07ee4337fecdd32d2cfff222",
+      "url": "https://raw.githubusercontent.com/OpenCloudGaming/OpenNOW/a49b124ce31e87113fd4961f6a321fbf0ad1fdc5/native/opennow-streamer/crates/opennow-streamer-core/src/webrtc/signaling.rs"
+    },
+    {
+      "path": "native/opennow-streamer/crates/opennow-streamer-core/src/webrtc/signaling/tests.rs",
+      "file": "native__opennow-streamer__crates__opennow-streamer-core__src__webrtc__signaling__tests.rs",
+      "bytes": 9903,
+      "sha256": "bdabb1409fe44d6fb59490a4c8b3c879f22fe25fb0c3a0f88b4cac58ea2edf13",
+      "git_blob": "7fe6b5dac783610656e9dab5f920a51843b5b5cc",
+      "url": "https://raw.githubusercontent.com/OpenCloudGaming/OpenNOW/a49b124ce31e87113fd4961f6a321fbf0ad1fdc5/native/opennow-streamer/crates/opennow-streamer-core/src/webrtc/signaling/tests.rs"
+    },
+    {
+      "path": "native/opennow-streamer/crates/opennow-streamer-transport/src/webrtc/mod.rs",
+      "file": "native__opennow-streamer__crates__opennow-streamer-transport__src__webrtc__mod.rs",
+      "bytes": 43140,
+      "sha256": "727a473e6036105c8af5ea5739ba9ba95515e5f11ff4d077fc3ee92827572339",
+      "git_blob": "9ec10d01fd1a7a0518ddb1611dbe68521f5535e5",
+      "url": "https://raw.githubusercontent.com/OpenCloudGaming/OpenNOW/a49b124ce31e87113fd4961f6a321fbf0ad1fdc5/native/opennow-streamer/crates/opennow-streamer-transport/src/webrtc/mod.rs"
+    },
+    {
+      "path": "native/opennow-core/src/cloudmatch.rs",
+      "file": "native__opennow-core__src__cloudmatch.rs",
+      "bytes": 297347,
+      "sha256": "563ef4e513fa784094fbae33b6f8e622846903fcf88b6f282e4445e5b19bd491",
+      "git_blob": "74cc7946cb5bd223a1b64c540470b15fa3f2cf86",
+      "url": "https://raw.githubusercontent.com/OpenCloudGaming/OpenNOW/a49b124ce31e87113fd4961f6a321fbf0ad1fdc5/native/opennow-core/src/cloudmatch.rs"
+    },
+    {
+      "path": "native/opennow-streamer/crates/opennow-streamer-core/src/webrtc/sdp.rs",
+      "file": "native__opennow-streamer__crates__opennow-streamer-core__src__webrtc__sdp.rs",
+      "bytes": 8292,
+      "sha256": "4605059c8787a8de1942ca76c7a3abaef88ca852e88eb2e91e8b60bd4dd437b9",
+      "git_blob": "233ff514ee9effd3c826474c208d49941f4f278f",
+      "url": "https://raw.githubusercontent.com/OpenCloudGaming/OpenNOW/a49b124ce31e87113fd4961f6a321fbf0ad1fdc5/native/opennow-streamer/crates/opennow-streamer-core/src/webrtc/sdp.rs"
+    },
+    {
+      "path": "LICENSE",
+      "file": "LICENSE",
+      "bytes": 1063,
+      "sha256": "5d00339c6bcca47bc7db1412fb3abda80918ee631d7abe7609045754307a97e3",
+      "git_blob": "3ca06cd13d073127d1ae6ebe160fc75e8ddbab65",
+      "url": "https://raw.githubusercontent.com/OpenCloudGaming/OpenNOW/a49b124ce31e87113fd4961f6a321fbf0ad1fdc5/LICENSE"
+    },
+    {
+      "path": "native/opennow-streamer/crates/opennow-streamer-core/src/webrtc/mod.rs",
+      "git_blob": "3743ef0d1df5c873f602fac633a03645d30fac93",
+      "sha256": "4131b2f1bf554452f8b1c7f15f788a193cb72e0bc7cec9650307e78539b49baf"
+    }
+  ],
+  "nvidia_bundle": {
+    "url": "https://play.geforcenow.com/mall/vendor.67f3eddbbf4416ca.js",
+    "bytes": 3063057,
+    "sha256": "f175c303fb44476f15a3f75eb6bb5438ef93e4f9c50c29067002c447fd6ae3e1"
+  }
+}

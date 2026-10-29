@@ -13,14 +13,20 @@ import org.json.*;
 final class SessionRoute {
   /** Apply the authenticated game-node route to WSS as well, retaining its DNS TLS identity. */
   static OkHttpClient signaling(OkHttpClient original, SessionClient.Seat seat) {
-    HttpUrl url = HttpUrl.parse(seat.signaling.replaceFirst("^wss://", "https://"));
+    return route(original, seat, seat.signaling, true);
+  }
+
+  private static OkHttpClient route(
+      OkHttpClient original, SessionClient.Seat seat, String target, boolean websocket) {
+    HttpUrl url = HttpUrl.parse(target.replaceFirst("^wss://", "https://"));
     if (url == null) return original;
     try {
       Api.validateServiceUrl(url.toString());
     } catch (java.io.IOException ignored) {
       return original;
     }
-    JSONArray list = Json.arr(seat.raw, "connectionInfo");
+    JSONArray list = websocket && seat.signalingConnection != null
+        ? Json.a(seat.signalingConnection) : Json.arr(seat.raw, "connectionInfo");
     for (int i = 0; i < list.length(); i++) {
       JSONObject c = list.optJSONObject(i);
       if (c == null || (c.optInt("usage") != 14 && c.optInt("usage") != 16)) continue;
@@ -28,7 +34,13 @@ final class SessionRoute {
       HttpUrl supplied = HttpUrl.parse(resource.replaceFirst("^(wss|rtsps?)://", "https://"));
       // Only the IP paired with this exact signaling hostname may override its DNS.
       if (supplied == null || !supplied.host().equals(url.host())) continue;
-      String ip = Json.s(c, "ip");
+      if (websocket) {
+        HttpUrl candidate = HttpUrl.parse(
+            StreamEndpoint.signaling(c).replaceFirst("^wss://", "https://"));
+        if (candidate == null || candidate.port() != url.port()
+            || !candidate.encodedPath().equals(url.encodedPath())) continue;
+      }
+      String ip = ServiceAddress.first(c.opt("ip"));
       InetAddress address = publicIpv4(ip);
       if (address == null) continue;
       Dns dns = original.dns();
@@ -45,11 +57,7 @@ final class SessionRoute {
 
   static OkHttpClient read(OkHttpClient original, SessionClient.Seat seat, String base) {
     // GET uses normal DNS for regional brokers; only a matching game-node host can be pinned.
-    SessionClient.Seat route = new SessionClient.Seat();
-    route.resumed = true;
-    route.raw = seat.raw;
-    route.signaling = base;
-    return signaling(original, route);
+    return route(original, seat, base, false);
   }
 
   private static InetAddress publicIpv4(String ip) {
@@ -69,30 +77,7 @@ final class SessionRoute {
   }
 
   static OkHttpClient claim(OkHttpClient original, SessionClient.Seat seat, String base) {
-    if (!base.equals(seat.base) && !base.equals(seat.control)) return original;
-    JSONArray list = Json.arr(seat.raw, "connectionInfo");
-    for (int i = 0; i < list.length(); i++) {
-      JSONObject c = list.optJSONObject(i);
-      if (c == null || c.optInt("usage") != 14) continue;
-      String ip = Json.s(c, "ip");
-      if (!ip.matches("[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+")) continue;
-      try {
-        InetAddress address = InetAddress.getByName(ip);
-        if (address.isAnyLocalAddress()
-            || address.isLoopbackAddress()
-            || address.isSiteLocalAddress()
-            || address.isLinkLocalAddress()
-            || address.isMulticastAddress()) continue;
-        String host = HttpUrl.get(base).host();
-        Dns dns = original.dns();
-        return original
-            .newBuilder()
-            .dns(name -> name.equals(host) ? Collections.singletonList(address) : dns.lookup(name))
-            .connectionPool(new ConnectionPool(0, 1, TimeUnit.SECONDS))
-            .build();
-      } catch (UnknownHostException | IllegalArgumentException ignored) {
-      }
-    }
-    return original;
+    // The game IP must not replace a different controller/broker DNS identity on RESUME.
+    return route(original, seat, base, false);
   }
 }

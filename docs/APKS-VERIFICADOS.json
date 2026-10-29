@@ -1,38 +1,38 @@
 [
   {
-    "filename": "BGFN-TV-15-ARM64.apk",
-    "version_code": 15,
-    "version_name": "0.15.0",
+    "filename": "BGFN-TV-19-ARM64.apk",
+    "version_code": 19,
+    "version_name": "0.19.0",
     "abi": "arm64-v8a",
-    "bytes": 14324192,
-    "sha256": "b66a8b4f63ae1af15c263d93435a72bbc7f1df161fa42ab9b7960c4f75d8ce2e",
+    "bytes": 14340576,
+    "sha256": "31a833b213be913a36b4e98bf997012ba805d0db82938645b7243f359ba89990",
     "certificate_sha256": "211f89add792612448c978b6a465305cca3fc14d2c81ca87662ba6fbe2d77607"
   },
   {
-    "filename": "BGFN-TV-15-ARMv7.apk",
-    "version_code": 15,
-    "version_name": "0.15.0",
+    "filename": "BGFN-TV-19-ARMv7.apk",
+    "version_code": 19,
+    "version_name": "0.19.0",
     "abi": "armeabi-v7a",
-    "bytes": 9060834,
-    "sha256": "e9186eed30a75b371fbd84d2ce34a8ce307f937b7c28dbfd50d66ddd2102e037",
+    "bytes": 9077218,
+    "sha256": "a8c909ff8d71a35fc94beceff8a05b6ef7ac6b7eed389134aaf624ba281ba8f2",
     "certificate_sha256": "211f89add792612448c978b6a465305cca3fc14d2c81ca87662ba6fbe2d77607"
   },
   {
-    "filename": "BGFN-TV-15-Universal.apk",
-    "version_code": 15,
-    "version_name": "0.15.0",
+    "filename": "BGFN-TV-19-Universal.apk",
+    "version_code": 19,
+    "version_name": "0.19.0",
     "abi": "universal",
-    "bytes": 37237395,
-    "sha256": "ad6bb08cbcc2723a9e5494c2814803fc228d476640276c20e6c2b87844046f3f",
+    "bytes": 37253779,
+    "sha256": "2339bb13ac25bfc558ecc8d01eaf8d6cd8175a167dc587c410fb5a6f72a1987e",
     "certificate_sha256": "211f89add792612448c978b6a465305cca3fc14d2c81ca87662ba6fbe2d77607"
   },
   {
-    "filename": "BGFN-TV-15-x86_64.apk",
-    "version_code": 15,
-    "version_name": "0.15.0",
+    "filename": "BGFN-TV-19-x86_64.apk",
+    "version_code": 19,
+    "version_name": "0.19.0",
     "abi": "x86_64",
-    "bytes": 18297309,
-    "sha256": "0913edec5bf2a070501a2fbab3498f8ef02446d72cf7202e36156e0ee43fcf97",
+    "bytes": 18313693,
+    "sha256": "0bff8f931eabf6ed7d956744603cab065737f3e533487f58c60796bbaf5fdf38",
     "certificate_sha256": "211f89add792612448c978b6a465305cca3fc14d2c81ca87662ba6fbe2d77607"
   }
 ]

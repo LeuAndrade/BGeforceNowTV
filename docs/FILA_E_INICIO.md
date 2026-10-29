@@ -1,31 +1,23 @@
-# Fila e início do streaming — 0.15.0
+# Conexão — BGeforce Now TV 0.19.0
 
-A imagem enviada mostra o player aguardando SDP, sem resposta, com ICE NEW e zero candidatos. Isso situa a falha antes de qualquer quadro para o decoder; não demonstra um gargalo de decodificação. Sem logs completos/autenticação não é possível atribuir a ocorrência na TV a uma causa única.
+A foto da 0.18 confirma WebSocket aberto, 12 mensagens, atribuição de peer e ACK 3, sem oferta SDP após três tentativas. Isso localiza o problema antes do ICE, do vídeo e do decoder. A foto não contém os descritores originais nem os corpos dos pacotes; não prova isoladamente a causa exata da sessão do usuário.
 
-## Mudanças
+## Correções desta revisão
 
-1. A leitura prioriza os campos de progresso da fila antes do snapshot inicial no topo. Nulo não é zero; números inválidos são ignorados.
-2. Respostas alternadas com posição antiga não desfazem cada avanço. Uma posição maior só é exibida após duas leituras consecutivas iguais. Isso não altera a fila do provedor e não congela permanentemente um aumento legítimo.
-3. Ao chegar a zero, a tela mostra Preparando sessão. O player só inicia em status 2/3 com endpoint; seatSetupStep=1 mantém a espera. Zero não é tratado como vídeo pronto.
-4. Quando uma consulta passa de fila para pronta, há uma consulta adicional limitada ao nó autenticado atribuído. O ID deve ser o mesmo; uma réplica ainda em fila não substitui a resposta pronta. Falhas transitórias nessa leitura mantêm a resposta anterior utilizável; autenticação/TLS continuam sendo verificadas.
-5. A sinalização de sessão nova também usa o IP público autenticado pareado ao hostname exato, antes aplicado somente à retomada. URL/SNI/certificado e hostname continuam validados; IP privado/inválido ou de outro hostname não substitui DNS. A rota da última leitura válida fica priorizada. Um endpoint novo antes do SDP pode reiniciar o transporte no máximo duas vezes, preservando sessão e qualidade. Uma imagem ativa não é reiniciada por essa regra.
-6. O socket é vinculado já no callback de abertura, evitando perder ACKs/mensagens numa resposta imediata. Se não chega oferta SDP em 12 s após abrir, tenta novamente apenas o WebSocket, dentro de três conexões. A última utiliza uma identidade nova; a oferta cancela o prazo. Fechar cancela os trabalhos. Não se repetem criação, RESUME ou DELETE por ausência de oferta.
-7. O erro de inicialização também informa se o WebSocket abriu e quantas mensagens recebeu. Tokens e sessão continuam ocultos. Oferta vazia é erro explícito, não sucesso.
+- O cliente NVIDIA atual marca como seguro o descritor de sinalização usage=14/appLevelProtocol=5 e usa sua porta. A 0.18 reconhecia porta explícita apenas para protocolo 4, podendo acessar 443 enquanto o servidor anunciava outro canal. A 0.19 mantém a porta do protocolo 5, dá prioridade a esse descritor e não usa sua porta TLS como fallback UDP de vídeo. Uma URL WSS/HTTPS absoluta continua preservando sua própria porta. Descritores RTSP continuam usando o caminho de compatibilidade separado.
+- Os dois motores locais são clientes WebRTC. A seleção Native passou a pedir, na NVIDIA, BROWSER/WEBRTC com clientPlatformName=browser, como a opção de alocação browser do OpenNOW. Isso não carrega um site nem muda o decoder: Native continua WebRTC Android + MediaCodec. O contrato NATIVE/NVIDIA-CLASSIC de parceiros é preservado. Não se altera resolução/FPS/bitrate/codec escolhido.
+- A identidade é selecionada pelo serviço autenticado da conta, e permanece durante descoberta, fila, criação, consultas e retomada. Não é reclassificada como parceiro apenas porque o controlador usa outro domínio.
+- O diagnóstico inclui canal (usage/protocolo/porta), confirmação do nome do peer e os campos de transporte declarados pelo serviço. Copiar erro acrescenta os últimos 12 eventos de sinalização: tentativa, abertura, papel/conexão do peer e tipo de mensagem. Não contém corpos, SDP, tokens, nomes de peers ou IDs de sessão. Nenhum dado é enviado automaticamente.
 
-O layout, biblioteca, configurações, microfone, teclado/mouse/toque, retomada/fechamento e otimizações de decode/controle da 0.14 não foram retirados. O padrão segue Native/Compatível/720p60/H.264/8 Mbps; Full HD 1080p60/H.264/15 Mbps permanece opcional. Não é preciso reduzir para 30 FPS para aplicar esta correção.
+A sinalização 3.0, as confirmações, o fallback legado 2, TLS, cancelamento e os orçamentos finitos da 0.18 permanecem. Os arquivos centrais de mídia, biblioteca WebRTC, superfícies, controles e asset WebView não foram alterados.
 
-## Como atualizar
+## Fontes verificadas
 
-Instale uma variante 0.15 sobre a principal atual, sem desinstalar nem apagar dados. ARMv7 corresponde a Android ARM de 32 bits; ARM64 a 64 bits; Universal serve quando não souber. O processador sozinho não determina a arquitetura do sistema. Os ZIPs precisam ser extraídos, nunca renomeados para APK.
-
-Abra o mesmo jogo e acompanhe a fila. A indicação Preparando sessão em zero ainda pode durar enquanto o servidor prepara a máquina; não indica conexão já concluída. Esta versão não fura fila, renova tempo do plano nem substitui publicidade obrigatória do provedor. Se ainda falhar, Copiar erro permite distinguir falha de abertura WSS, socket aberto sem SDP e SDP recebido sem mídia.
+- Cliente NVIDIA público atual: https://play.geforcenow.com/mall/vendor.67f3eddbbf4416ca.js . O adaptador de sessão converte appLevelProtocol 5 em sinalização segura e transfere ip/port/resourcePath. O cliente web declara streamer WEBRTC. Bundle apenas inspecionado, sem execução ou redistribuição. SHA-256: f175c303fb44476f15a3f75eb6bb5438ef93e4f9c50c29067002c447fd6ae3e1.
+- OpenNOW Android, commit 1bea55a39c23d66780b9aedd85a5d967173d58d6: GfnApi.kt (identidades de alocação, modo browser, diferenças entre NVST e WebRTC), GfnSessionConnections.kt (separação de sinalização/mídia) e StreamSignaling.kt (contrato legado de peer/SDP). URLs e hashes em validation/REFERENCIAS_CONEXAO_0.19.json. O OpenNOW Android consultado mantém 443 para descritores relativos; o suporte explícito ao protocolo seguro 5 nesta revisão vem do adaptador NVIDIA, não dessa regra legada.
 
 ## Verificação e limites
 
-258 testes JUnit passaram (242 anteriores + 16 novos), incluindo trocas de rota com HTTP controlado e sinalização WebSocket sobre TLS validado. 59 verificações JavaScript passaram. Lint: zero erros e 31 avisos. APKs release ARMv7, ARM64, x86_64 e universal têm pacote/assinatura principal preservados e passam no verificador de assinatura v1/v2, alinhamento, manifesto, DEX, ABIs e integridade ZIP.
+Os cenários de regressão exercitam porta 5, prioridade do canal seguro, separação de UDP e pedido WebRTC com renderer Native. A fixture de sinalização TLS agora recebe o endpoint de um descritor protocolo 5 antes de confirmar peer, receber oferta e encaminhar resposta. A retomada é testada com controlador fora do domínio do broker e uma única mutação. Testes de parceiros, fila, autenticação e player são mantidos.
 
-A regressão da leitura/prontidão foi reproduzida na fonte 0.14 com o novo teste de contrato e apenas a classe de filtro adicionados: 8 testes, 4 falhas esperadas; os mesmos 8 passam na 0.15. O teste de socket silencioso usa um prazo reduzido somente no construtor de ensaio, para verificar o caminho real de timeout sem aguardar 12 s em cada conexão.
-
-Não houve partida autenticada nem acesso remoto à TV do usuário nesta revisão. As 25 verificações Android de player/entrada e 20 de interface registradas na pasta validation são históricas da 0.14, não execuções da 0.15. Não há benchmark físico de decode/FPS nem garantia de ausência de toda falha do servidor.
-
-Referência técnica consultada: protocolo de sessões/sinalização do projeto OpenNOW e Opennow-web (fontes preservadas da pesquisa anterior). As correções de fila, confirmação de aumento e gestão da passagem de endpoint neste projeto são próprias.
+Esses ensaios usam servidor local e payloads sintéticos; não equivalem a uma sessão autenticada, à fila real ou a um teste físico na TV. Não há garantia de que todos os erros do serviço foram eliminados. As contagens, assinatura e comparação dos binários constam em VERIFICACAO.md.

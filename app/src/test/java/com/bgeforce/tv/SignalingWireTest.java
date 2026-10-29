@@ -12,6 +12,7 @@ import javax.net.ssl.SSLHandshakeException;
 import okhttp3.*;
 import okhttp3.mockwebserver.*;
 import okhttp3.tls.*;
+import org.json.JSONObject;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -75,6 +76,9 @@ public class SignalingWireTest {
             new WebSocketListener() {
               public void onOpen(WebSocket ws, Response response) {
                 remote.set(ws);
+                if (serverError != null) ws.send(serverError);
+                else if (sendOffer) ws.send(Json.o("peer_msg", Json.o("from", 1, "to", 0,
+                    "msg", Json.o("type", "offer", "sdp", "v=0\r\n").toString())).toString());
               }
 
               public void onMessage(WebSocket ws, String message) {
@@ -131,7 +135,7 @@ public class SignalingWireTest {
     connect();
     assertTrue(offer.await(5, TimeUnit.SECONDS));
     RecordedRequest r = server.takeRequest(5, TimeUnit.SECONDS);
-    assertEquals("2", r.getRequestUrl().queryParameter("version"));
+    assertEquals("3.0", r.getRequestUrl().queryParameter("version"));
     assertNull(r.getRequestUrl().queryParameter("reconnect"));
     assertEquals("x-nv-sessionid.fixture-session", r.getHeader("Sec-WebSocket-Protocol"));
     assertNull(r.getHeader("Authorization"));
@@ -139,17 +143,17 @@ public class SignalingWireTest {
   }
 
   @Test
-  public void transientEofRetriesOnlyTheWebSocketUsingTheSamePeer() throws Exception {
+  public void transientEofRetriesOnlyTheWebSocketWithAFreshProtocolFallback() throws Exception {
     server.enqueue(new MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST));
     server.enqueue(upgrade(true));
     connect();
     assertTrue(offer.await(8, TimeUnit.SECONDS));
     RecordedRequest first = server.takeRequest(5, TimeUnit.SECONDS),
         next = server.takeRequest(5, TimeUnit.SECONDS);
-    assertEquals("2", first.getRequestUrl().queryParameter("version"));
-    assertEquals("3.0", next.getRequestUrl().queryParameter("version"));
-    assertEquals("1", next.getRequestUrl().queryParameter("reconnect"));
-    assertEquals(
+    assertEquals("3.0", first.getRequestUrl().queryParameter("version"));
+    assertEquals("2", next.getRequestUrl().queryParameter("version"));
+    assertNull(next.getRequestUrl().queryParameter("reconnect"));
+    assertNotEquals(
         first.getRequestUrl().queryParameter("peer_id"),
         next.getRequestUrl().queryParameter("peer_id"));
     assertEquals("GET", first.getMethod());
@@ -169,6 +173,21 @@ public class SignalingWireTest {
     assertTrue(errors.get(0).contains("ProtocolException"));
     assertTrue(errors.get(0).contains("game.nvidiagrid.net"));
     assertFalse(errors.get(0).contains("fixture-session"));
+  }
+
+  @Test public void unsupportedModernUpgradeFallsBackWithoutReplayingAccountMutations()
+      throws Exception {
+    server.enqueue(new MockResponse().setResponseCode(426));
+    server.enqueue(upgrade(true));
+    connect();
+    assertTrue(offer.await(5, TimeUnit.SECONDS));
+    RecordedRequest first = server.takeRequest(1, TimeUnit.SECONDS),
+        legacy = server.takeRequest(1, TimeUnit.SECONDS);
+    assertEquals("3.0", first.getRequestUrl().queryParameter("version"));
+    assertEquals("2", legacy.getRequestUrl().queryParameter("version"));
+    assertNull(legacy.getRequestUrl().queryParameter("reconnect"));
+    assertEquals("GET", first.getMethod()); assertEquals("GET", legacy.getMethod());
+    assertTrue(errors.isEmpty()); assertEquals(2, server.getRequestCount());
   }
 
   @Test
@@ -256,8 +275,8 @@ public class SignalingWireTest {
             .withWebSocketUpgrade(
                 new WebSocketListener() {
                   @Override
-                  public void onMessage(WebSocket ws, String value) {
-                    if (value.contains("peer_info")) ws.send("{\"error\":\"peerRemoved\"}");
+                  public void onOpen(WebSocket ws, Response response) {
+                    ws.send("{\"error\":\"peerRemoved\"}");
                   }
 
                   @Override
@@ -272,7 +291,7 @@ public class SignalingWireTest {
     RecordedRequest old = server.takeRequest(3, TimeUnit.SECONDS),
         fresh = server.takeRequest(3, TimeUnit.SECONDS);
     assertEquals("3.0", old.getRequestUrl().queryParameter("version"));
-    assertEquals("2", fresh.getRequestUrl().queryParameter("version"));
+    assertEquals("3.0", fresh.getRequestUrl().queryParameter("version"));
     assertNull(fresh.getRequestUrl().queryParameter("reconnect"));
     assertNotEquals(
         old.getRequestUrl().queryParameter("peer_id"),
@@ -291,8 +310,8 @@ public class SignalingWireTest {
     assertTrue(offer.await(6, TimeUnit.SECONDS));
     RecordedRequest first = server.takeRequest(2, TimeUnit.SECONDS);
     RecordedRequest second = server.takeRequest(2, TimeUnit.SECONDS);
-    assertEquals("2", first.getRequestUrl().queryParameter("version"));
-    assertEquals("3.0", second.getRequestUrl().queryParameter("version"));
+    assertEquals("3.0", first.getRequestUrl().queryParameter("version"));
+    assertEquals("2", second.getRequestUrl().queryParameter("version"));
     assertTrue(signal.hasOffer());
     assertTrue(errors.isEmpty());
   }
@@ -307,6 +326,21 @@ public class SignalingWireTest {
     assertTrue(errors.isEmpty());
   }
 
+  @Test public void anAlreadyDispatchedOfferTimeoutCannotFailAnAcceptedOffer() throws Exception {
+    server.enqueue(upgrade(true));
+    connect();
+    assertTrue(offer.await(3, TimeUnit.SECONDS));
+    Field generation = Signaling.class.getDeclaredField("generation");
+    generation.setAccessible(true);
+    java.lang.reflect.Method expiry = Signaling.class.getDeclaredMethod(
+        "offerExpired", int.class, int.class);
+    expiry.setAccessible(true);
+    expiry.invoke(signal, generation.getInt(signal), 0);
+    assertTrue(signal.hasOffer());
+    assertTrue(errors.isEmpty());
+    assertEquals(1, server.getRequestCount());
+  }
+
   @Test public void silentSocketsHaveAFiniteBudgetAndUseAFreshLastPeer() throws Exception {
     seat.resumed=false;
     for(int i=0;i<3;i++)server.enqueue(upgrade(false));
@@ -316,10 +350,46 @@ public class SignalingWireTest {
     RecordedRequest first=server.takeRequest(1,TimeUnit.SECONDS);
     RecordedRequest second=server.takeRequest(1,TimeUnit.SECONDS);
     RecordedRequest third=server.takeRequest(1,TimeUnit.SECONDS);
-    assertEquals("3.0",second.getRequestUrl().queryParameter("version"));
-    assertEquals("2",third.getRequestUrl().queryParameter("version"));
+    assertEquals("2",second.getRequestUrl().queryParameter("version"));
+    assertEquals("3.0",third.getRequestUrl().queryParameter("version"));
     assertNotEquals(first.getRequestUrl().queryParameter("peer_id"),third.getRequestUrl().queryParameter("peer_id"));
     assertEquals(3,server.getRequestCount());assertEquals(1,errors.size());
     assertTrue(errors.get(0).contains("No SDP offer"));
+  }
+
+  @Test public void legacyFallbackWaitsForTheOpenNowPeerAnnouncementAndUsesNoReconnectFlag()
+      throws Exception {
+    AtomicReference<JSONObject> announced = new AtomicReference<>();
+    server.enqueue(upgrade(false));
+    server.enqueue(new MockResponse().withWebSocketUpgrade(new WebSocketListener() {
+      @Override public void onOpen(WebSocket ws, Response response) { remote.set(ws); }
+      @Override public void onMessage(WebSocket ws, String text) {
+        JSONObject p = Json.parse(text), info = p.optJSONObject("peer_info");
+        if (info == null) return;
+        announced.set(info);
+        ws.send(Json.o("ackid", 1, "peer_info", Json.o("name", Json.s(info, "name"),
+            "id", 7)).toString());
+        ws.send(Json.o("ackid", 2, "peer_msg", Json.o("from", 9, "to", 7,
+            "msg", Json.o("type", "offer", "sdp", "v=0\r\n").toString())).toString());
+      }
+      @Override public void onClosing(WebSocket ws, int code, String reason) {
+        ws.close(code, reason); remoteClosed.countDown();
+      }
+    }));
+    signal = new Signaling(api, seat, false, "peer-first", listener, 300);
+    signal.connect();
+    assertTrue(offer.await(5, TimeUnit.SECONDS));
+    RecordedRequest first = server.takeRequest(1, TimeUnit.SECONDS),
+        legacy = server.takeRequest(1, TimeUnit.SECONDS);
+    assertEquals("3.0", first.getRequestUrl().queryParameter("version"));
+    assertEquals("2", legacy.getRequestUrl().queryParameter("version"));
+    assertNull(legacy.getRequestUrl().queryParameter("reconnect"));
+    assertNotEquals(first.getRequestUrl().queryParameter("peer_id"),
+        legacy.getRequestUrl().queryParameter("peer_id"));
+    assertEquals(0, announced.get().optInt("peerRole"));
+    assertEquals(2, announced.get().optInt("version"));
+    assertEquals("1280x720", Json.s(announced.get(), "resolution"));
+    assertTrue(errors.isEmpty());
+    assertEquals(2, server.getRequestCount());
   }
 }

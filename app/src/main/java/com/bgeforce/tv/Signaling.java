@@ -23,6 +23,8 @@ public final class Signaling implements AutoCloseable {
   private final Settings settings;
   private volatile String name;
   private boolean freshFallback;
+  private boolean modern = true;
+  private long receivedAck;
   private final ScheduledExecutorService timer = Executors.newSingleThreadScheduledExecutor();
   private final OkHttpClient http;
   private volatile WebSocket socket;
@@ -35,6 +37,8 @@ public final class Signaling implements AutoCloseable {
   private volatile int packets;
   private final boolean reconnect;
   private final long offerTimeoutMs;
+  private final ArrayDeque<String> wire = new ArrayDeque<>();
+  private boolean namedAssignment;
 
   public Signaling(Api api, SessionClient.Seat seat, boolean reconnect, Listener l) {
     this(api, seat, reconnect, SignalingPeer.newName(), l);
@@ -42,7 +46,7 @@ public final class Signaling implements AutoCloseable {
 
   public Signaling(
       Api api, SessionClient.Seat seat, boolean reconnect, String peerName, Listener l) {
-    this(api, seat, reconnect, peerName, l, 12000);
+    this(api, seat, reconnect, peerName, l, 20000);
   }
 
   Signaling(Api api, SessionClient.Seat seat, boolean reconnect, String peerName, Listener l,
@@ -57,8 +61,9 @@ public final class Signaling implements AutoCloseable {
         SessionRoute.signaling(api.http, seat)
             .newBuilder()
             .pingInterval(0, TimeUnit.MILLISECONDS)
-            .readTimeout(0, TimeUnit.MILLISECONDS)
-            .callTimeout(0, TimeUnit.MILLISECONDS)
+            .connectTimeout(5, TimeUnit.SECONDS)
+            .readTimeout(10, TimeUnit.SECONDS)
+            .callTimeout(15, TimeUnit.SECONDS)
             .connectionSpecs(
                 Collections.singletonList(
                     new ConnectionSpec.Builder(ConnectionSpec.MODERN_TLS)
@@ -74,13 +79,18 @@ public final class Signaling implements AutoCloseable {
   }
 
   static Request request(SessionClient.Seat seat, String name, boolean reconnect) {
+    return request(seat, name, reconnect, true);
+  }
+
+  private static Request request(
+      SessionClient.Seat seat, String name, boolean reconnect, boolean modern) {
     String base = seat.signaling.split("[?#]", 2)[0].replaceAll("/+$", "");
     if (!base.endsWith("/sign_in")) base += "/sign_in";
     HttpUrl url =
         HttpUrl.get(base.replaceFirst("^wss://", "https://"))
             .newBuilder()
             .addQueryParameter("peer_id", name)
-            .addQueryParameter("version", reconnect ? "3.0" : "2")
+            .addQueryParameter("version", modern ? "3.0" : "2")
             .addQueryParameter("peer_role", "1")
             .addQueryParameter("pairing_id", seat.id)
             .build();
@@ -100,14 +110,21 @@ public final class Signaling implements AutoCloseable {
   private synchronized void connectAttempt(int attempt) {
     if (closed || terminal) return;
     int value = ++generation;
+    // 3.0 fresh -> OpenNOW's legacy 2 fresh -> 3.0 fresh. Protocol != reconnection.
+    modern = attempt != 1 || reconnect;
+    if (attempt > 0) name = SignalingPeer.newName();
     own = 0;
     remote = 1;
+    receivedAck = 0;
+    ack = 0;
     opened = false;
     packets = 0;
+    namedAssignment = false;
+    note("tentativa=" + (attempt + 1) + " protocolo=" + (modern ? "3.0" : "2"));
     try {
       socket =
           http.newWebSocket(
-              request(seat, name, reconnectAttempt(attempt)),
+              request(seat, name, reconnectAttempt(attempt), modern),
               new WebSocketListener() {
                 @Override
                 public void onOpen(WebSocket ws, Response response) {
@@ -118,8 +135,10 @@ public final class Signaling implements AutoCloseable {
                     }
                     socket = ws;
                     opened = true;
-                    // Use this socket explicitly: a fast callback must not lose peer_info.
-                    ws.send(
+                    note("WebSocket aberto");
+                    // Version 3 assigns peer_info on the server. Version 2 requires this
+                    // legacy OpenNOW announcement. Sending it on 3 mixes two wire contracts.
+                    if (!modern) ws.send(
                         Json.o(
                                 "ackid",
                                 nextAck(),
@@ -143,10 +162,9 @@ public final class Signaling implements AutoCloseable {
                                     2))
                             .toString());
                     stopHeartbeat();
-                    offerDeadline = timer.schedule(() -> failed(value, attempt,
-                        new SocketTimeoutException("No SDP offer after WebSocket sign-in"), null),
+                    offerDeadline = timer.schedule(() -> offerExpired(value, attempt),
                         offerTimeoutMs, TimeUnit.MILLISECONDS);
-                    heartbeat =
+                    if (!modern) heartbeat =
                         timer.scheduleWithFixedDelay(
                             () -> {
                               if (current(value)) ws.send(Json.o("hb", 1).toString());
@@ -199,17 +217,26 @@ public final class Signaling implements AutoCloseable {
     offerDeadline = null;
   }
 
+  private synchronized void offerExpired(int value, int attempt) {
+    // cancel(false) cannot stop a timeout callback already waiting for this monitor.
+    // An SDP accepted first must win that race instead of turning into a terminal timeout.
+    if (current(value) && !offered) failed(value, attempt,
+        new SocketTimeoutException("No SDP offer after WebSocket sign-in"), null);
+  }
+
   private void failed(int value, int attempt, Throwable error, Response response) {
     final WebSocket previous;
     synchronized (this) {
       if (!current(value)) return;
       stopHeartbeat();
       // A claim can briefly rotate its transport. Retry only WSS, never RESUME/POST/DELETE.
-      if (!offered && attempt < 2 && retryable(error, response)) {
+      boolean unsupportedVersion = modern && response != null
+          && (response.code() == 400 || response.code() == 404 || response.code() == 426);
+      if (!offered && attempt < 2 && (retryable(error, response) || unsupportedVersion)) {
         ++generation; // Old callbacks cannot affect the next socket.
         WebSocket stale = socket;
         socket = null;
-        if (attempt == 1) { freshFallback = true; name = SignalingPeer.newName(); }
+        freshFallback = true;
         if (stale != null) stale.cancel();
         timer.schedule(
             () -> connectAttempt(attempt + 1), (attempt + 1) * 1000L, TimeUnit.MILLISECONDS);
@@ -234,19 +261,49 @@ public final class Signaling implements AutoCloseable {
             + "\nservidor="
             + (endpoint == null ? "indisponível" : endpoint.host())
             + " · protocolo="
-            + (reconnectAttempt(attempt) ? "3.0" : "2")
+            + (modern ? "3.0" : "2")
             + " · tentativa="
-            + (attempt + 1));
+            + (attempt + 1) + "\n" + startupState());
   }
 
   private boolean reconnectAttempt(int attempt) {
-    return !freshFallback && (reconnect || attempt > 0);
+    return !freshFallback && reconnect && attempt == 0;
   }
 
   synchronized boolean hasOffer() { return offered; }
 
-  String startupState() {
-    return "WSS=" + (opened ? "aberto" : "conectando") + " · mensagens=" + packets;
+  synchronized String startupState() {
+    JSONObject c = seat.signalingConnection;
+    return "WSS=" + (opened ? "aberto" : "conectando") + " · mensagens=" + packets
+        + " · peer=" + (own > 0 ? "atribuído" : "aguardando")
+        + " · ACK=" + receivedAck + " · SDP=" + offered
+        + "\ncanal=" + (c == null ? "indefinido" : c.optInt("usage", -1)
+            + "/" + c.optInt("appLevelProtocol", -1) + ":" + StreamEndpoint.port(c))
+        + " · nome confirmado=" + namedAssignment + " · " + transportHint();
+  }
+
+  private String transportHint() {
+    JSONObject request = Json.obj(seat.raw, "sessionRequestData");
+    boolean webrtc = false;
+    JSONArray metadata = Json.arr(request, "metaData");
+    for (int i = 0; i < metadata.length(); i++) {
+      JSONObject entry = metadata.optJSONObject(i);
+      if ("GSStreamerType".equals(Json.s(entry, "key"))
+          && "WebRTC".equals(Json.s(entry, "value"))) webrtc = true;
+    }
+    return "pedido=" + (webrtc ? "WebRTC" : "não informado")
+        + " · streamer=" + request.optInt("streamerVersion", -1)
+        + " · RTSPS=" + (request.has("secureRTSPSupported")
+            ? String.valueOf(request.optBoolean("secureRTSPSupported")) : "?");
+  }
+
+  private synchronized void note(String text) {
+    if (wire.size() == 12) wire.removeFirst();
+    wire.addLast(text);
+  }
+
+  synchronized String wireHistory() {
+    return "Sinalização (sem corpos/tokens):\n" + Json.join("\n", wire);
   }
 
   String peerName() {
@@ -291,19 +348,41 @@ public final class Signaling implements AutoCloseable {
     return ++ack;
   }
 
-  private void handle(int value, int attempt, String text) {
+  private synchronized void handle(int value, int attempt, String text) {
+    if (!current(value)) return;
     try {
+      if (text.length() > 512 * 1024) throw new JSONException("Signaling message too large");
       packets++;
       JSONObject p = new JSONObject(text), info = p.optJSONObject("peer_info");
-      if (info != null && name.equals(Json.s(info, "name"))) own = info.optInt("id", own);
-      if (p.has("ackid") && (info == null || info.optInt("id", -1) != own))
-        send(Json.o("ack", p.optInt("ackid")));
-      if (p.has("hb")) {
-        send(Json.o("hb", p.opt("hb")));
+      if (info != null) {
+        boolean self = name.equals(Json.s(info, "name"));
+        if (self) namedAssignment = true;
+        note("peer_info self=" + self + " role=" + info.optInt("peerRole", -1)
+            + " conectado=" + (info.has("connected")
+                ? String.valueOf(info.optBoolean("connected")) : "?")
+            + " ackid=" + p.optLong("ackid", -1));
+      }
+      if (info != null && (name.equals(Json.s(info, "name")) || (modern && own == 0)))
+        own = info.optInt("id", own);
+      if (p.has("ackid")) {
+        long next = p.optLong("ackid", -1);
+        if (next < 0) throw new JSONException("Invalid signaling ACK");
+        if (modern) {
+          // ACK even our own assignment; the server may wait for it before sending SDP.
+          send(Json.o("ack", Math.max(receivedAck, next)));
+          if (next <= receivedAck) return;
+          receivedAck = next;
+        } else if (info == null || info.optInt("id", -1) != own) {
+          send(Json.o("ack", next));
+          receivedAck = Math.max(receivedAck, next);
+        }
+      }
+      if (p.optInt("hb") != 0) {
+        if (!modern) send(Json.o("hb", 1));
         return;
       }
       if ("peerRemoved".equals(Json.s(p, "error")) && recoverRemovedPeer(value, attempt)) return;
-      if (p.has("error")) {
+      if (p.has("error") && !p.isNull("error")) {
         failed(
             value,
             attempt,
@@ -315,25 +394,33 @@ public final class Signaling implements AutoCloseable {
       if (msg == null) return;
       remote = msg.optInt("from", remote);
       String message = Json.s(msg, "msg");
-      if (message.equals("BYE")) {
+      if (message.trim().equals("BYE")) {
         failed(
             value, attempt, new IOException("O servidor desconectou este transporte (BYE)"), null);
         return;
       }
       JSONObject data = new JSONObject(message);
+      String type = Json.s(data, "type");
+      note("peer_msg tipo=" + ("offer".equals(type) ? "oferta"
+          : data.has("candidate") ? "ICE" : "outro")
+          + " ackid=" + p.optLong("ackid", -1));
       if (Json.s(data, "type").equals("offer")) {
-        if (Json.s(data, "sdp").trim().isEmpty())
+        if (Json.s(data, "sdp").trim().isEmpty() || Json.s(data, "sdp").length() > 256 * 1024)
           throw new JSONException("Empty SDP offer");
         synchronized (this) {
+          if (offered) return;
           offered = true;
           if (offerDeadline != null) offerDeadline.cancel(false);
           offerDeadline = null;
         }
         listener.offer(Json.s(data, "sdp"));
-      } else if (data.has("candidate"))
+      } else if (data.has("candidate")) {
+        if (Json.s(data, "candidate").length() > 4096)
+          throw new JSONException("ICE candidate too large");
         listener.ice(
             new IceCandidate(
                 Json.s(data, "sdpMid"), data.optInt("sdpMLineIndex"), Json.s(data, "candidate")));
+      }
     } catch (JSONException e) {
       failed(value, attempt, new IOException("Invalid signaling message", e), null);
     }

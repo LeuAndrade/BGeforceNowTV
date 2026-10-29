@@ -1,10 +1,30 @@
-# BGeforce Now TV — 0.15.0
+# BGeforce Now TV — 0.19.0
+
+Suporte ao canal WebSocket seguro protocolo 5, correção de portas e separação entre a alocação WebRTC da NVIDIA e o renderer Native/MediaCodec. O decoder, qualidade escolhida e interface foram preservados. Consulte [conexão](docs/FILA_E_INICIO.md), [verificação](docs/VERIFICACAO.md) e [guia GitHub](docs/GITHUB_PASSO_A_PASSO.md). As seções de versões anteriores abaixo são históricas.
+
+# BGeforce Now TV — 0.18.0
+
+Correção da negociação de streaming: sinalização 3.0 nova com confirmação da atribuição do peer, alternativa legada 2 baseada no OpenNOW, seleção de portas/endpoints e associação correta de DNS/IP. Qualidade escolhida e decoder preservados. Veja [revisão da conexão](docs/FILA_E_INICIO.md), [verificação](docs/VERIFICACAO.md) e [guia GitHub](docs/GITHUB_PASSO_A_PASSO.md).
+
+# BGeforce Now TV — 0.17.0
 
 Cliente independente para Android TV, com interface de catálogo e biblioteca, login pelo celular e streaming WebRTC Native ou WebView. Não é um aplicativo oficial da NVIDIA. O projeto tem estrutura própria e pode ser colocado num repositório novo, sem fork.
 
 O padrão permanece **Native · Compatível · 1280×720 · 60 FPS · H.264 · 8 Mbps**. O caminho Compatível e o perfil padrão que já funcionaram na TV foram preservados. 60 FPS é o alvo: rede, servidor, driver e capacidade do aparelho determinam a taxa real.
 
-## Correções da 0.15 — fila e início do streaming
+## Correções da 0.17 — controle da fila
+
+O cliente passa a resolver local-region também para NVIDIA e a seguir o sessionControlInfo autenticado durante a fila, incluindo mudanças e endereços em lista. Respostas parciais conservam o controlador vigente; a URL inicial fica como fallback quando não há indicação válida. Servidor escolhido manualmente é preservado. A política da 0.16 que mantinha a fila presa ao endereço inicial foi substituída.
+
+Copiar erro inclui oito registros curtos de rota/progresso com tempos relativos, sem tokens, IDs ou corpos. Decoder, qualidade, controles, interface e escolhas salvas permanecem. 282 testes Java e 59 verificações JS passaram; os três casos de handoff falham na 0.16 e passam na 0.17. Não houve partida autenticada na TV.
+
+Veja [FILA_E_INICIO.md](docs/FILA_E_INICIO.md) e [VERIFICACAO.md](docs/VERIFICACAO.md). As seções seguintes registram versões anteriores; a política de rota da 0.16 não está mais em uso.
+
+## Correções da 0.16
+
+A fila conserva o broker de origem, mostra a posição atual sem o filtro da 0.15 e reconhece statusCode=69 como expiração terminal. Tentar novamente descarta o ID abandonado antes de uma nova solicitação. Veja [FILA_E_INICIO.md](docs/FILA_E_INICIO.md). Decoder e qualidade preservados; sem partida autenticada nesta revisão.
+
+## Histórico: correções da 0.15 — fila e início do streaming
 
 - A posição usa o progresso de seatSetupInfo/sessionProgress antes do campo inicial do broker. Valores nulos, negativos ou fracionários não viram posição zero.
 - Respostas alternadas de réplicas não fazem a posição voltar a cada consulta. Um aumento real é aceito após duas leituras consecutivas iguais; trocar de sessão limpa esse filtro.

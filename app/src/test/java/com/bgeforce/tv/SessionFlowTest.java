@@ -64,7 +64,12 @@ public class SessionFlowTest {
         new Api(
             account,
             settings(prefs),
-            new OkHttpClient.Builder().addInterceptor(interceptor).build());
+            new OkHttpClient.Builder().addInterceptor(chain -> {
+              if (base.equals(Api.DEFAULT_BASE) && chain.request().method().equals("GET")
+                  && chain.request().url().encodedPath().equals("/v2/serverInfo"))
+                return response(chain.request(), 200, Json.o("metaData", Json.a()));
+              return interceptor.intercept(chain);
+            }).build());
     assertTrue(api.restore());
     return api;
   }

@@ -48,3 +48,11 @@ As capas, nomes, textos promocionais e marcas dos jogos pertencem aos respectivo
 - xStreaming: mesma revisão 9e6a21251c379c861cc48f105530895dab9180c3, NanoMediaCodecHelper/LowLatencyVideoDecoder/Factory e configuração; consulta de capacidades e prioridades. Nenhum código ou módulo AGPL foi incorporado.
 - Nuvem-TV: https://github.com/LeuAndrade/Nuvem-TV, revisão 3d3efd9b84d15a7197babe24e544526e2884e6cb; LowLatencyDecoderFactory e NativePlayer consultados para hardware e FEATURE_LowLatency. Nenhum código, recurso, autenticação ou protocolo xCloud desse projeto foi incorporado.
 - O letreiro vetorial do banner foi desenhado com contornos de DejaVu Sans. Não há arquivo de fonte no APK. Aviso do pacote da fonte em licenses/DejaVu-copyright.txt. Símbolo, navegação e demais ícones são código/vetores próprios.
+
+## Referências adicionais da 0.18
+
+OpenNOW main a49b124ce31e87113fd4961f6a321fbf0ad1fdc5: cloudmatch.rs, webrtc/signaling.rs e webrtc/mod.rs revistos para roteamento, endpoints e contrato legado. Avisos MIT existentes preservados. O bundle web público NVIDIA foi somente inspecionado para o contrato 3.0; não foi incorporado ou redistribuído. Implementação Java, integração e testes desta revisão são próprios. URLs/hashes em docs/FILA_E_INICIO.md.
+
+## Referências adicionais da 0.19
+
+OpenNOW Android 1bea55a39c23d66780b9aedd85a5d967173d58d6, GfnApi.kt/GfnSessionConnections.kt/StreamSignaling.kt, revistos para alocação WebRTC, contrato de parceiros e separação de endpoints. Avisos MIT existentes preservados. O adaptador público NVIDIA foi apenas inspecionado para o protocolo seguro 5; seu bundle não integra o projeto. Implementação Java e testes desta revisão são próprios.

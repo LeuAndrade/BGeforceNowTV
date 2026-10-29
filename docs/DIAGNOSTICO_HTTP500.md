@@ -1,3 +1,13 @@
+# Diagnóstico atual — 0.19.0
+
+A foto atual da 0.18 mostra WSS aberto/ACK 3 e falta de oferta SDP. Correções em FILA_E_INICIO.md; o conteúdo anterior abaixo é histórico, incluindo HTTP 500/503 de versões anteriores.
+
+# Diagnóstico atual — 0.18.0
+
+O relato atual da 0.17 é timeout de oferta SDP depois do WebSocket, distinto dos HTTP 500/503 anteriores. Leia FILA_E_INICIO.md para a revisão de todas as etapas e VERIFICACAO.md para os ensaios. O diagnóstico abaixo é histórico.
+
+> Atualização 0.17: a descoberta regional e o controle retornado pelo serviço agora governam as consultas. Veja FILA_E_INICIO.md para a correção de fila; o texto abaixo é histórico. Não se afirma que todo HTTP 500/503 do provedor foi eliminado.
+
 > Atualização 0.15: veja [FILA_E_INICIO.md](FILA_E_INICIO.md) para a correção de fila e espera de SDP e [VERIFICACAO.md](VERIFICACAO.md) para os testes atuais. O texto abaixo documenta a revisão anterior.
 
 > Atualização 0.14: interface de TV renovada, perfil Full HD opcional, fechamento explícito nos detalhes e recuperação limitada de GET 500/peerRemoved/inicialização sem quadro. As otimizações dos controles da 0.13 permanecem. Leia NOVO_LAYOUT_E_1080P.md e VERIFICACAO.md para o comportamento atual e os testes. As seções abaixo registram também revisões anteriores.

@@ -1,37 +1,55 @@
-BGeforce Now TV 0.15.0 — 258 testes; 0 falhas; 0 erros; 0 ignorados.
+# Verificação — BGeforce Now TV 0.19.0
 
-com.bgeforce.tv.DecoderSelectionTest: 2 testes; falhas=0; erros=0
-com.bgeforce.tv.SessionFlowTest: 16 testes; falhas=0; erros=0
-com.bgeforce.tv.GamepadWireTest: 2 testes; falhas=0; erros=0
-com.bgeforce.tv.AuthHttpTest: 7 testes; falhas=0; erros=0
-com.bgeforce.tv.ProtocolTest: 25 testes; falhas=0; erros=0
-com.bgeforce.tv.DirectDecoderInputTest: 2 testes; falhas=0; erros=0
-com.bgeforce.tv.QueueTransitionTest: 8 testes; falhas=0; erros=0
-com.bgeforce.tv.DecoderRecoveryTest: 3 testes; falhas=0; erros=0
-com.bgeforce.tv.NetworkCleanupTest: 8 testes; falhas=0; erros=0
-com.bgeforce.tv.MediaEndpointTest: 4 testes; falhas=0; erros=0
-com.bgeforce.tv.LaunchContractTest: 12 testes; falhas=0; erros=0
-com.bgeforce.tv.ResumeSessionTest: 17 testes; falhas=0; erros=0
-com.bgeforce.tv.FreeLaunchTest: 6 testes; falhas=0; erros=0
-com.bgeforce.tv.PointerControlsTest: 14 testes; falhas=0; erros=0
-com.bgeforce.tv.SignalingFailureTextTest: 3 testes; falhas=0; erros=0
-com.bgeforce.tv.CrashTextTest: 3 testes; falhas=0; erros=0
-com.bgeforce.tv.TvLayoutPolicyTest: 5 testes; falhas=0; erros=0
-com.bgeforce.tv.SignalingWireTest: 13 testes; falhas=0; erros=0
-com.bgeforce.tv.StreamingBudgetTest: 20 testes; falhas=0; erros=0
-com.bgeforce.tv.ControllerOverheadTest: 1 testes; falhas=0; erros=0
-com.bgeforce.tv.StartupWatchdogTest: 3 testes; falhas=0; erros=0
-com.bgeforce.tv.ResumeSignalingRegressionTest: 1 testes; falhas=0; erros=0
-com.bgeforce.tv.StreamMetricsTest: 11 testes; falhas=0; erros=0
-com.bgeforce.tv.ActivePollContinuityTest: 3 testes; falhas=0; erros=0
-com.bgeforce.tv.NativeStatsTest: 4 testes; falhas=0; erros=0
-com.bgeforce.tv.AssignedSeatTest: 4 testes; falhas=0; erros=0
-com.bgeforce.tv.SessionReadRecoveryTest: 7 testes; falhas=0; erros=0
-com.bgeforce.tv.FullHdProfileTest: 3 testes; falhas=0; erros=0
-com.bgeforce.tv.AccountPolicyTest: 10 testes; falhas=0; erros=0
-com.bgeforce.tv.SignalingRouteTest: 5 testes; falhas=0; erros=0
-com.bgeforce.tv.ControllerDispatchTest: 12 testes; falhas=0; erros=0
-com.bgeforce.tv.ApiFlowTest: 2 testes; falhas=0; erros=0
-com.bgeforce.tv.SignalingPeerTest: 5 testes; falhas=0; erros=0
-com.bgeforce.tv.StreamingWorkTest: 11 testes; falhas=0; erros=0
-com.bgeforce.tv.StreamPerformanceTest: 6 testes; falhas=0; erros=0
+303 testes Java aprovados; zero falhas, erros ou ignorados. 59 verificações JavaScript aprovadas. Lint: zero erros e 31 avisos. Build release concluído. Quatro APKs standalone (ARMv7, ARM64, Universal, x86_64) verificados: pacote com.bgeforce.tv.main, versão 19/0.19.0, mesma assinatura principal v1/v2, ABIs, alinhamento, DEX e integridade ZIP.
+
+SecureChannel19RegressionTest reproduz quatro falhas na fonte entregue da 0.18: porta do protocolo seguro 5, separação de mídia UDP, prioridade do canal seguro e classe de alocação do renderer Native. O log em validation/ANTES_0.18_CANAL_SEGURO.txt registra essas falhas esperadas. Os mesmos cenários passam na 0.19. As expectativas antigas do contrato NVIDIA foram atualizadas para BROWSER/WEBRTC; o contrato de parceiros permanece NATIVE/NVIDIA-CLASSIC.
+
+A fixture SignalingV3RegressionTest usa o descritor protocolo 5 para obter a URL e realiza TLS/WebSocket, atribuição/ACK, oferta e resposta roteada sintéticos. ProviderIdentity19Test verifica uma única mutação de retomada e a identidade NVIDIA em outro domínio de controlador. A privacidade do histórico também é verificada. Isso não é uma partida real nem uma conta autenticada.
+
+Bibliotecas nativas, asset WebView e arquivos centrais de mídia/decoder/controles/Settings são idênticos aos da 0.18, conforme PIPELINE_PRESERVADO_0.19.json. Não houve teste físico na TV, medição de FPS/decode ou validação autenticada de GFN nesta revisão. Não se afirma que todos os erros do serviço foram eliminados. Veja FILA_E_INICIO.md.
+
+com.bgeforce.tv.StreamPerformanceTest: 6 testes; falhas=0
+com.bgeforce.tv.SignalingFailureTextTest: 4 testes; falhas=0
+com.bgeforce.tv.MediaEndpointTest: 4 testes; falhas=0
+com.bgeforce.tv.DecoderSelectionTest: 2 testes; falhas=0
+com.bgeforce.tv.SignalingWireTest: 16 testes; falhas=0
+com.bgeforce.tv.ApiFlowTest: 2 testes; falhas=0
+com.bgeforce.tv.SignalingV3RegressionTest: 1 testes; falhas=0
+com.bgeforce.tv.ControllerOverheadTest: 1 testes; falhas=0
+com.bgeforce.tv.StreamMetricsTest: 11 testes; falhas=0
+com.bgeforce.tv.GamepadWireTest: 2 testes; falhas=0
+com.bgeforce.tv.CrashTextTest: 3 testes; falhas=0
+com.bgeforce.tv.ResumeSessionTest: 17 testes; falhas=0
+com.bgeforce.tv.AuthHttpTest: 7 testes; falhas=0
+com.bgeforce.tv.EndpointRegressionTest: 7 testes; falhas=0
+com.bgeforce.tv.QueueHandoffRegressionTest: 3 testes; falhas=0
+com.bgeforce.tv.NetworkCleanupTest: 8 testes; falhas=0
+com.bgeforce.tv.ServiceAddressTest: 5 testes; falhas=0
+com.bgeforce.tv.DirectDecoderInputTest: 2 testes; falhas=0
+com.bgeforce.tv.QueueTransitionTest: 8 testes; falhas=0
+com.bgeforce.tv.ProviderIdentity19Test: 2 testes; falhas=0
+com.bgeforce.tv.SecureChannel19RegressionTest: 4 testes; falhas=0
+com.bgeforce.tv.SignalingRouteTest: 5 testes; falhas=0
+com.bgeforce.tv.FreeLaunchTest: 6 testes; falhas=0
+com.bgeforce.tv.StreamingWorkTest: 11 testes; falhas=0
+com.bgeforce.tv.ResumeSignalingRegressionTest: 1 testes; falhas=0
+com.bgeforce.tv.AssignedSeatTest: 4 testes; falhas=0
+com.bgeforce.tv.StartupWatchdogTest: 3 testes; falhas=0
+com.bgeforce.tv.ConnectionRouteRegressionTest: 3 testes; falhas=0
+com.bgeforce.tv.SessionFlowTest: 16 testes; falhas=0
+com.bgeforce.tv.AccountPolicyTest: 10 testes; falhas=0
+com.bgeforce.tv.QueueFixTest: 10 testes; falhas=0
+com.bgeforce.tv.ControllerDispatchTest: 12 testes; falhas=0
+com.bgeforce.tv.SessionReadRecoveryTest: 7 testes; falhas=0
+com.bgeforce.tv.DecoderRecoveryTest: 3 testes; falhas=0
+com.bgeforce.tv.ActivePollContinuityTest: 3 testes; falhas=0
+com.bgeforce.tv.TvLayoutPolicyTest: 5 testes; falhas=0
+com.bgeforce.tv.SignalingPeerTest: 5 testes; falhas=0
+com.bgeforce.tv.PointerControlsTest: 14 testes; falhas=0
+com.bgeforce.tv.StreamingBudgetTest: 20 testes; falhas=0
+com.bgeforce.tv.NativeStatsTest: 4 testes; falhas=0
+com.bgeforce.tv.LaunchContractTest: 12 testes; falhas=0
+com.bgeforce.tv.ProtocolTest: 25 testes; falhas=0
+com.bgeforce.tv.FullHdProfileTest: 3 testes; falhas=0
+com.bgeforce.tv.RegionalDiscoveryTest: 4 testes; falhas=0
+com.bgeforce.tv.SessionTraceTest: 2 testes; falhas=0

@@ -1,0 +1,12 @@
+{
+  "test_source_sha256": "a02a56c6429250a6fc22ca2e9b414299ebebf6a7078b83f6e4c4ff38207a2e6e",
+  "same_test_source": true,
+  "before_0.18": {
+    "tests": 4,
+    "failures": 4
+  },
+  "after_0.19": {
+    "tests": 4,
+    "failures": 0
+  }
+}

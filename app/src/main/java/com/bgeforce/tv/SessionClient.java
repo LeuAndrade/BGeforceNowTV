@@ -11,10 +11,13 @@ public final class SessionClient {
   private final String clientId = UUID.randomUUID().toString();
   private String lastLaunchBase;
   private LaunchIdentity identity;
+  private final SessionTrace trace = new SessionTrace();
   private final Set<String> confirmedLibrary = new HashSet<>();
+  private final Set<String> abandonedSessions = new HashSet<>();
 
   public static final class Seat {
     public JSONObject raw;
+    public JSONObject signalingConnection;
     public String id, base, signaling = "", ip = "", control = "", mediaIp = "";
     public int mediaPort;
     public int status, queue = -1;
@@ -22,10 +25,11 @@ public final class SessionClient {
     public boolean resumed;
     public boolean readPinned;
     public int setupStep = -1;
+    public String queueBase = "";
     public JSONArray ice = new JSONArray();
 
     public boolean ready() {
-      return (status == 2 || status == 3) && setupStep != 1 && !signaling.isEmpty();
+      return (status == 2 || status == 3) && !signaling.isEmpty();
     }
   }
 
@@ -105,7 +109,15 @@ public final class SessionClient {
   public Active findActive(String appId) throws IOException {
     List<Active> found = new ArrayList<>();
     collectActive(api.settings.get("serverUrl", api.base()), found, new HashSet<>());
-    for (Active active : found) if (active.appId.equals(appId)) return active;
+    for (Active active : found) {
+      if (!active.appId.equals(appId)) continue;
+      if (waiting(active.seat)) {
+        try { return new Active(poll(active.seat)); }
+        catch (QueueAbandoned expired) { continue; }
+        catch (IOException uncertain) { return active; }
+      }
+      return active;
+    }
     return null;
   }
 
@@ -115,7 +127,8 @@ public final class SessionClient {
       JSONObject raw = list.optJSONObject(i);
       int status = raw == null ? 0 : raw.optInt("status");
       String app = Json.s(Json.obj(raw, "sessionRequestData"), "appId");
-      if ((status != 1 && status != 2 && status != 3) || !app.matches("[0-9]+")) continue;
+      if ((status != 1 && status != 2 && status != 3) || !app.matches("[0-9]+")
+          || abandonedSessions.contains(Json.s(raw,"sessionId"))) continue;
       Seat seat = parse(Json.o("session", raw), base);
       if (!seat.id.isEmpty() && seen.add(seat.id)) out.add(new Active(seat));
     }
@@ -126,7 +139,7 @@ public final class SessionClient {
     if (id == null || id.isEmpty() || !appId.matches("[0-9]+"))
       throw new IOException("Invalid session to resume");
     Api.validateServiceUrl(base);
-    identity = LaunchIdentity.select(base, "native");
+    identity = LaunchIdentity.select(api.base(), "native");
     Seat fresh = parse(call(base, "/v2/session/" + encodedId(id), "GET", null), base);
     if (fresh.status != 1 && fresh.status != 2 && fresh.status != 3)
       throw new IOException("The cloud session is no longer active");
@@ -179,12 +192,13 @@ public final class SessionClient {
 
   static LinkedHashSet<String> resumeTargets(Seat seat) {
     LinkedHashSet<String> targets = new LinkedHashSet<>();
+    if (!seat.control.isEmpty()) targets.add(seat.control);
     JSONArray connections = Json.arr(seat.raw, "connectionInfo");
     for (int i = 0; i < connections.length(); i++) {
       JSONObject c = connections.optJSONObject(i);
       if (c == null || c.optInt("usage") != 14) continue;
       String resource = Json.s(c, "resourcePath").replaceFirst("^wss://", "https://");
-      for (String url : new String[] {resource, "https://" + Json.s(c, "ip")}) {
+      for (String url : new String[] {resource, "https://" + ServiceAddress.first(c.opt("ip"))}) {
         try {
           Api.validateServiceUrl(url);
           targets.add(
@@ -200,7 +214,7 @@ public final class SessionClient {
 
   JSONObject resumeRequest(Seat seat, String appId) throws IOException {
     JSONObject original = Json.obj(seat.raw, "sessionRequestData");
-    LaunchIdentity profile = LaunchIdentity.select(seat.base, "native");
+    LaunchIdentity profile = LaunchIdentity.select(api.base(), "native");
     JSONObject req =
         Json.o(
             "audioMode",
@@ -280,7 +294,7 @@ public final class SessionClient {
     Headers h = api.headers(api.token());
     for (String k : h.names()) r.header(k, h.get(k));
     LaunchIdentity profile =
-        identity == null ? LaunchIdentity.select(base, api.settings.engine()) : identity;
+        identity == null ? LaunchIdentity.select(api.base(), api.settings.engine()) : identity;
     r.header("nv-client-id", clientId)
         .header("x-device-id", api.store.deviceId())
         .header("nv-browser-type", "CHROME")
@@ -290,8 +304,20 @@ public final class SessionClient {
     if (method.equals("POST")) r.post(Api.json(body));
     if (method.equals("PUT")) r.put(Api.json(body));
     if (method.equals("DELETE")) r.delete();
-    JSONObject payload = api.authenticated(r.build(), "GFNJWT", transport);
-    JSONObject rs = Json.obj(payload, "requestStatus");
+    if (method.equals("GET")) r.header("Cache-Control","no-cache, no-store").header("Pragma","no-cache");
+    JSONObject payload;
+    try { payload=api.authenticated(r.build(),"GFNJWT",transport); }
+    catch (Api.Failure e) {
+      record(method, base, e.payload);
+      if (abandoned(e.payload)) throw abandoned(path,e.getMessage());
+      throw e;
+    } catch (IOException e) {
+      trace.record(method, base, -1, -1, -1, "");
+      throw e;
+    }
+    record(method, base, payload);
+    JSONObject rs = Json.obj(payload,"requestStatus");
+    if(abandoned(payload)) throw abandoned(path,"GFN statusCode=69");
     if (rs.has("statusCode") && rs.optInt("statusCode") != 1)
       throw new IOException(
           "GFN · "
@@ -317,7 +343,7 @@ public final class SessionClient {
     Api.validateServiceUrl(base);
     base = resolveLaunchBase(base);
     lastLaunchBase = base;
-    identity = LaunchIdentity.select(base, s.engine());
+    identity = LaunchIdentity.select(api.base(), s.engine());
     JSONObject body = buildRequest(variant, base);
     HttpUrl launchUrl =
         HttpUrl.get(base)
@@ -342,6 +368,7 @@ public final class SessionClient {
         JSONObject request = Json.obj(candidate, "sessionRequestData");
         int status = candidate == null ? 0 : candidate.optInt("status");
         if ((status == 1 || status == 2 || status == 3 || status == 6)
+            && !abandonedSessions.contains(Json.s(candidate,"sessionId"))
             && variant.id.equals(Json.s(request, "appId"))
             && api.store.deviceId().equals(Json.s(request, "deviceHashId")))
           return parse(Json.o("session", candidate), lastLaunchBase);
@@ -360,33 +387,60 @@ public final class SessionClient {
 
   private String resolveLaunchBase(String base) throws IOException {
     String host = HttpUrl.get(base).host();
-    if (!host.startsWith("prod.") || !host.endsWith(".geforcenow.nvidiagrid.net")) return base;
-    JSONObject info = api.gfn(base.replaceAll("/+$", "") + "/v2/serverInfo", "GET", null);
-    return regionalBase(base, Json.arr(info, "metaData"));
+    if (!host.startsWith("prod.") || !(host.endsWith(".geforcenow.nvidiagrid.net")
+        || isNvidia(base))) return base;
+    try {
+      JSONObject info = call(base, "/v2/serverInfo", "GET", null);
+      return regionalBase(base, Json.arr(info, "metaData"));
+    } catch (Api.Failure e) {
+      if (e.code == 401 || e.code == 403) throw e;
+      return base;
+    } catch (IOException unavailable) { return base; }
   }
 
   static String regionalBase(String base, JSONArray metadata) throws IOException {
-    Set<String> urls = new LinkedHashSet<>();
+    Map<String, String> entries = new LinkedHashMap<>();
     for (int i = 0; i < metadata.length(); i++) {
       JSONObject item = metadata.optJSONObject(i);
-      String key = Json.s(item, "key"), value = Json.s(item, "value");
-      if (key.startsWith("gfn-") || key.isEmpty()) continue;
-      try {
-        Api.validateServiceUrl(value);
-        HttpUrl u = HttpUrl.get(value);
-        String url = u.newBuilder().encodedPath("/").query(null).build().toString();
-        if (!u.host().equals(HttpUrl.get(base).host())) urls.add(url);
-      } catch (IOException | IllegalArgumentException ignored) {
-      }
+      entries.put(Json.s(item, "key").trim(), Json.s(item, "value").trim());
     }
-    // Match upstream: a single regional endpoint can replace the provider root.
-    // Multiple regions require the broker or the server selected by the user.
+    String local = entries.get("local-region");
+    if (local != null && !local.isEmpty()) {
+      String supplied = local.startsWith("https://") ? local : entries.get(local);
+      String resolved = normalizedBase(supplied);
+      if (!resolved.isEmpty()) return resolved;
+    }
+    Set<String> urls = new LinkedHashSet<>();
+    for (Map.Entry<String, String> item : entries.entrySet()) {
+      String key = item.getKey();
+      if (key.isEmpty() || key.startsWith("gfn-") || key.equals("local-region")) continue;
+      String normalized = normalizedBase(item.getValue());
+      if (!normalized.isEmpty() && !HttpUrl.get(normalized).host().equals(HttpUrl.get(base).host()))
+        urls.add(normalized);
+    }
     return urls.size() == 1 ? urls.iterator().next() : base;
   }
 
+  private static String normalizedBase(String value) {
+    if (value == null || value.isEmpty()) return "";
+    try {
+      Api.validateServiceUrl(value);
+      return HttpUrl.get(value).newBuilder().encodedPath("/").query(null).build().toString();
+    } catch (IOException | IllegalArgumentException invalid) { return ""; }
+  }
+
+  private void record(String method, String base, JSONObject payload) {
+    JSONObject state = Json.obj(payload, "session");
+    trace.record(method, base, Json.obj(payload, "requestStatus").optInt("statusCode", -1),
+        state.optInt("status", -1), queue(state), ServiceAddress.control(state));
+  }
+
+  public String routeSummary() { return trace.summary(); }
+  public String routeHistory() { return trace.details(); }
+
   JSONObject buildRequest(Game.Variant variant, String base) throws IOException {
     Settings s = api.settings;
-    LaunchIdentity profile = LaunchIdentity.select(base, s.engine());
+    LaunchIdentity profile = LaunchIdentity.select(api.base(), s.engine());
     JSONObject monitor =
         Json.o(
             "widthInPixels",
@@ -537,13 +591,19 @@ public final class SessionClient {
     IOException failure = null;
     for (String base : readTargets(previous)) {
       try {
-        OkHttpClient transport = SessionRoute.read(api.http, previous, base);
+        OkHttpClient transport = waiting(previous)
+            ? api.http.newBuilder().connectTimeout(5,java.util.concurrent.TimeUnit.SECONDS)
+                .readTimeout(8,java.util.concurrent.TimeUnit.SECONDS)
+                .callTimeout(8,java.util.concurrent.TimeUnit.SECONDS).retryOnConnectionFailure(false).build()
+            : SessionRoute.read(api.http,previous,base);
         Seat fresh =
             parse(
                 call(base, "/v2/session/" + encodedId(previous.id), "GET", null, transport), base);
         if (!fresh.id.equals(previous.id)) throw new IOException("Session identity changed");
-        fresh.resumed = previous.resumed;
-        fresh.readPinned = true;
+        fresh.resumed=previous.resumed;
+        fresh.queueBase = !fresh.control.isEmpty() ? fresh.control
+            : previous.queueBase.isEmpty() ? base : previous.queueBase;
+        fresh.readPinned=true;
         // The zone can report allocation before its connectionInfo has converged. Resolve once
         // against the authenticated assigned node before handing the seat to either player.
         if (!previous.ready() && fresh.ready()) fresh = assignedSeat(fresh);
@@ -567,8 +627,9 @@ public final class SessionClient {
       if (!direct.id.equals(zone.id)) throw new IOException("Session identity changed");
       // A lagging replica must not turn an assigned seat back into its original queue snapshot.
       if (!direct.ready()) return zone;
-      direct.resumed = zone.resumed;
-      direct.readPinned = true;
+      direct.resumed=zone.resumed;
+      direct.queueBase=zone.queueBase;
+      direct.readPinned=true;
       return direct;
     } catch (IOException error) {
       if (!transientRead(error) && !(error instanceof Api.Failure
@@ -579,6 +640,13 @@ public final class SessionClient {
 
   static LinkedHashSet<String> readTargets(Seat seat) {
     LinkedHashSet<String> targets = new LinkedHashSet<>();
+    if(waiting(seat)) {
+      String owner = !seat.queueBase.isEmpty() ? seat.queueBase
+          : !seat.control.isEmpty() ? seat.control : seat.base;
+      try { Api.validateServiceUrl(owner); targets.add(HttpUrl.get(owner).toString()); }
+      catch(IOException ignored) { }
+      return targets;
+    }
     // The last successful read/claim route has priority. A region alias can return 500 for this
     // node.
     for (String target : previousReadOrder(seat)) {
@@ -600,8 +668,27 @@ public final class SessionClient {
         : new String[] {seat.control, seat.base};
   }
 
+  static boolean waiting(Seat seat) { return seat.status==1 || seat.status==6 || (seat.status!=2 && seat.status!=3 && seat.setupStep==1); }
+
+  public static final class QueueAbandoned extends IOException {
+    QueueAbandoned(String reason) {
+      super("A solicitação de fila expirou no servidor (statusCode=69). Selecione Tentar novamente para entrar em uma nova fila.\n"+reason);
+    }
+  }
+  static boolean abandoned(JSONObject payload) {
+    JSONObject status=Json.obj(payload,"requestStatus");
+    return status.optInt("statusCode",-1)==69
+        || "SESSION_REQUEST_IN_QUEUE_ABANDONED".equals(Json.s(status,"statusDescription"));
+  }
+  private QueueAbandoned abandoned(String path,String reason) {
+    HttpUrl u=HttpUrl.parse(Api.DEFAULT_BASE.replaceAll("/+$","")+path);
+    if(u!=null && u.pathSegments().size()==3) abandonedSessions.add(u.pathSegments().get(2));
+    return new QueueAbandoned(reason);
+  }
+
   static boolean transientRead(Throwable failure) {
     if (failure instanceof Api.Failure) {
+      if(abandoned(((Api.Failure)failure).payload)) return false;
       int code = ((Api.Failure) failure).code;
       return code == 408
           || code == 425
@@ -613,7 +700,8 @@ public final class SessionClient {
     }
     if (failure instanceof javax.net.ssl.SSLException
         || failure instanceof java.net.ProtocolException) return false;
-    return failure instanceof java.net.SocketException
+    return failure instanceof java.io.InterruptedIOException
+        || failure instanceof java.net.SocketException
         || failure instanceof java.net.SocketTimeoutException
         || failure instanceof java.net.UnknownHostException
         || failure instanceof java.io.EOFException;
@@ -653,7 +741,8 @@ public final class SessionClient {
     if (!s.has("sessionId")) throw new IOException("No session returned");
     Seat seat = new Seat();
     seat.raw = s;
-    seat.base = base;
+    seat.base=base;
+    seat.queueBase=base;
     seat.id = Json.s(s, "sessionId");
     seat.status = s.optInt("status");
     seat.queue = queue(s);
@@ -666,32 +755,14 @@ public final class SessionClient {
               Json.o("urls", "stun:s1.stun.gamestream.nvidia.com:19308"),
               Json.o("urls", "stun:stun.l.google.com:19302"),
               Json.o("urls", "stun:stun1.l.google.com:19302"));
-    JSONObject control = Json.obj(s, "sessionControlInfo");
-    String host = Json.s(control, "ip");
-    if (!host.isEmpty()) {
-      String c =
-          "https://"
-              + host
-              + (control.optInt("port", 443) == 443 ? "" : ":" + control.optInt("port"));
-      try {
-        Api.validateServiceUrl(c);
-        seat.control = c;
-      } catch (IOException ignored) {
-        /* Keep the authenticated broker if no trusted DNS control host was supplied. */
-      }
-    }
+    seat.control = ServiceAddress.control(s);
+    // The response's control endpoint owns this session, including while still queued.
+    if (!seat.control.isEmpty()) seat.queueBase = seat.control;
     JSONArray cc = Json.arr(s, "connectionInfo");
-    for (int i = 0; i < cc.length(); i++) {
-      JSONObject c = cc.optJSONObject(i);
-      if (c != null && (c.optInt("usage") == 2 || c.optInt("usage") == 17)) {
-        String ip = Json.s(c, "ip");
-        int port = c.optInt("port");
-        if (!ip.isEmpty() && port > 0 && port <= 65535) {
-          seat.mediaIp = ip;
-          seat.mediaPort = port;
-          if (c.optInt("usage") == 2) break;
-        }
-      }
+    JSONObject media = StreamEndpoint.media(cc);
+    if (media != null) {
+      seat.mediaIp = StreamEndpoint.host(media);
+      seat.mediaPort = StreamEndpoint.port(media);
     }
     List<JSONObject> signalingCandidates = new ArrayList<>();
     for (int i = 0; i < cc.length(); i++) {
@@ -699,26 +770,16 @@ public final class SessionClient {
       if (c != null && (c.optInt("usage") == 14 || c.optInt("usage") == 16))
         signalingCandidates.add(c);
     }
-    Collections.sort(
-        signalingCandidates, (a, b) -> Integer.compare(signalingPriority(a), signalingPriority(b)));
+    Collections.sort(signalingCandidates,
+        (a, b) -> Integer.compare(StreamEndpoint.priority(a), StreamEndpoint.priority(b)));
     for (JSONObject c : signalingCandidates) {
-      String resource = Json.s(c, "resourcePath"), ip = Json.s(c, "ip"), url;
-      if (resource.startsWith("wss://") || resource.startsWith("https://"))
-        url = resource.replaceFirst("^https://", "wss://");
-      else if (resource.startsWith("rtsps://") || resource.startsWith("rtsp://")) {
-        HttpUrl u = HttpUrl.parse(resource.replaceFirst("^rtsps?://", "https://"));
-        if (u == null) continue;
-        url = "wss://" + u.host() + "/nvst/";
-      } else if (!ip.isEmpty() && (resource.isEmpty() || resource.startsWith("/")))
-        url =
-            "wss://"
-                + (ip.contains(":") ? "[" + ip + "]" : ip)
-                + (resource.isEmpty() ? "/nvst/" : resource);
-      else continue;
+      String url = StreamEndpoint.signaling(c);
+      if (url.isEmpty()) continue;
       HttpUrl u = HttpUrl.parse(url.replaceFirst("^wss://", "https://"));
-      if (u == null || !u.username().isEmpty() || !u.password().isEmpty() || u.fragment() != null)
-        continue;
+      if (u == null) continue;
       seat.signaling = url;
+      seat.signalingConnection = c;
+      String ip = ServiceAddress.first(c.opt("ip"));
       seat.ip = ip.isEmpty() ? u.host() : ip;
       break;
     }
@@ -727,21 +788,13 @@ public final class SessionClient {
     return seat;
   }
 
-  private static int signalingPriority(JSONObject connection) {
-    String resource = Json.s(connection, "resourcePath");
-    if (resource.startsWith("wss://") || resource.startsWith("https://")) return 0;
-    if (connection.optInt("usage") == 14)
-      return resource.startsWith("rtsp://") || resource.startsWith("rtsps://") ? 1 : 0;
-    return 2;
-  }
-
   static int queue(JSONObject s) {
-    // Live seat progress wins over the initial, sometimes retained, top-level snapshot.
-    for (String k : new String[] {"seatSetupInfo", "sessionProgress", "progressInfo"}) {
-      int value = queueNumber(Json.obj(s, k).opt("queuePosition"));
-      if (value >= 0) return value;
+    int current=queueNumber(s.opt("queuePosition"));
+    if(current>=0) return current;
+    for(String key:new String[]{"sessionProgress","progressInfo","seatSetupInfo"}) {
+      int n=queueNumber(Json.obj(s,key).opt("queuePosition")); if(n>=0)return n;
     }
-    return queueNumber(s.opt("queuePosition"));
+    return -1;
   }
 
   private static int queueNumber(Object raw) {

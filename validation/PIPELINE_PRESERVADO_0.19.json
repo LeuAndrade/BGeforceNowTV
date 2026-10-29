@@ -1,0 +1,67 @@
+[
+  {
+    "entry": "lib/arm64-v8a/libjingle_peerconnection_so.so",
+    "sha256": "5d68547da3fad7679846187577a0333c10d9ff4d39322bce61f366426924612e",
+    "identical_to_0.18": true
+  },
+  {
+    "entry": "lib/armeabi-v7a/libjingle_peerconnection_so.so",
+    "sha256": "58e3fd27ef738fb11a66f8d8548dc7aed4225986207d3b32b498125ce6735815",
+    "identical_to_0.18": true
+  },
+  {
+    "entry": "lib/x86_64/libjingle_peerconnection_so.so",
+    "sha256": "6fa42eba21bcf4d02234d63e007b58966d9919d0d1eb0c887b8ef005964f7158",
+    "identical_to_0.18": true
+  },
+  {
+    "entry": "assets/stream.html",
+    "sha256": "2e782f071d09e73a3858d9aca8815e628b296cbf8e004a9cf02e97b34d0ab189",
+    "identical_to_0.18": true
+  },
+  {
+    "source": "app/src/main/java/com/bgeforce/tv/NativeEngine.java",
+    "sha256": "4573ca06ec452c3585b0c8f9406ef3fe3a0f3612b516091f21534b2e46e01f50",
+    "identical_to_0.18": true
+  },
+  {
+    "source": "app/src/main/java/com/bgeforce/tv/WebEngine.java",
+    "sha256": "c873e817d6ec37b8acc6f908f01dcca76a7b77d145dba609cf8bc22fd9d3da45",
+    "identical_to_0.18": true
+  },
+  {
+    "source": "app/src/main/java/com/bgeforce/tv/DecoderFactory.java",
+    "sha256": "32420faeead9f39df6b1497d76dead3a99cd8e3ff067b4be0f4cb959e99524e2",
+    "identical_to_0.18": true
+  },
+  {
+    "source": "app/src/main/java/com/bgeforce/tv/SurfaceDecoder.java",
+    "sha256": "c4fbca5b74113a33b4c2b698ee06b09cafedb8e618eae3162e9700854d198052",
+    "identical_to_0.18": true
+  },
+  {
+    "source": "app/src/main/java/com/bgeforce/tv/SurfaceFrame.java",
+    "sha256": "4f545831240690bde95d3f2ead3b12f7542b6409e3dd8a08842bbac1d267dcde",
+    "identical_to_0.18": true
+  },
+  {
+    "source": "app/src/main/java/com/bgeforce/tv/Sdp.java",
+    "sha256": "60ef19e426970284c0f5e2971288cf2cdfc720c1db2d9bb3b5d82e1a0de59bbf",
+    "identical_to_0.18": true
+  },
+  {
+    "source": "app/src/main/java/com/bgeforce/tv/InputEncoder.java",
+    "sha256": "39950611a0007b486a76fa356f5e56f40561fd149b9d0b5ac11d8e25e335a94e",
+    "identical_to_0.18": true
+  },
+  {
+    "source": "app/src/main/java/com/bgeforce/tv/PadChanges.java",
+    "sha256": "b6280075538f13d4950e484725a26e3af8bd4011ecbb02ae4ea28334c6008bf1",
+    "identical_to_0.18": true
+  },
+  {
+    "source": "app/src/main/java/com/bgeforce/tv/Settings.java",
+    "sha256": "32a7903cd0ce4977884feb3e33410e833c1ac127533ae612703196772fae96d6",
+    "identical_to_0.18": true
+  }
+]

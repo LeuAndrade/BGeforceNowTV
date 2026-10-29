@@ -30,4 +30,12 @@ public class SignalingFailureTextTest {
     assertTrue(text.length() < 100);
     assertTrue(text.contains("IOException"));
   }
+
+  @Test public void fullServiceHostnameIsNotMistakenForAJwtToken() {
+    String host = "66-22-134-148.cloudmatchbeta.nvidiagrid.net";
+    assertEquals(host, Diagnostics.safe(host));
+    assertFalse(Diagnostics.safe("abcdefghijk.abcdefghijk.abcdefghijk").contains("abcdefghijk"));
+    assertFalse(Diagnostics.safe("GFNJWT eyJhbGciOiJIUzI1NiJ9.abcdefghijk.abcdefghijk")
+        .contains("eyJhbGci"));
+  }
 }

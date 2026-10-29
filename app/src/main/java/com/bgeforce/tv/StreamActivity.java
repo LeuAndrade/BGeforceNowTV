@@ -41,6 +41,7 @@ public final class StreamActivity extends Activity
   private int keyButtons, hatButtons, lt, rt, lx, ly, rx, ry;
   private long createdAt, offerAt;
   private int pollErrors;
+  private boolean abandonedQueue;
   private volatile int transportGeneration;
   private boolean ageDialogShowing, controlsSuspended;
   private final SignalingPeer signalingPeer = new SignalingPeer();
@@ -244,9 +245,7 @@ public final class StreamActivity extends Activity
             ui.post(() -> updateSeat(fresh));
           } catch (Api.AgeRequired required) {
             ui.post(() -> confirmAge(recovering));
-          } catch (Exception error) {
-            error(error.getMessage());
-          }
+          } catch (Exception error) { sessionError(error); }
         });
   }
 
@@ -362,9 +361,14 @@ public final class StreamActivity extends Activity
                   ui.post(
                       () -> {
                         if (closed || generation != transportGeneration) return;
-                        if (SessionClient.transientRead(e) && (playing || pollErrors < 4))
-                          ui.postDelayed(this, Math.min(30000, 3000L * Math.min(pollErrors, 10)));
-                        else error(Diagnostics.failure(e));
+                        abandonedQueue=e instanceof SessionClient.QueueAbandoned;
+                        if(SessionClient.transientRead(e)
+                            && (playing || pollErrors<(SessionClient.waiting(previous)?8:4))) {
+                          if(SessionClient.waiting(previous) && queue!=null)
+                            queue.setText(settings.locale().getLanguage().equals("pt")?"Atualizando fila…":"Updating queue…");
+                          ui.postDelayed(this,SessionClient.waiting(previous)?Math.min(2000,1000L*pollErrors)
+                              :Math.min(30000,3000L*Math.min(pollErrors,10)));
+                        } else error(Diagnostics.failure(e));
                       });
                 }
               });
@@ -446,6 +450,10 @@ public final class StreamActivity extends Activity
               public void offer(String sdp) {
                 if (closed || failed || generation != transportGeneration) return;
                 signalingPeer.remember(connectionSeat.id, connectionSeat.signaling, signaling.peerName());
+                ui.post(() -> {
+                  if (!closed && !failed && generation == transportGeneration)
+                    offerAt = SystemClock.elapsedRealtime();
+                });
                 encoder.version = Sdp.protocol(sdp);
                 engine.offer(sdp);
               }
@@ -575,7 +583,8 @@ public final class StreamActivity extends Activity
         public void run() {
           if (closed) return;
           long now = SystemClock.elapsedRealtime();
-          if (started && !playing && now - offerAt > 45000) {
+          long startupBudget = signaling != null && !signaling.hasOffer() ? 120000 : 45000;
+          if (started && !playing && now - offerAt > startupBudget) {
             if (startupRecoveries++ == 0 && seat != null) {
               SessionClient.Seat previous = seat;
               signalingPeer.reset();
@@ -594,9 +603,7 @@ public final class StreamActivity extends Activity
                           () -> {
                             if (!closed && !failed) updateSeat(fresh);
                           });
-                    } catch (Exception e) {
-                      error(Diagnostics.failure(e));
-                    }
+                    } catch(Exception e) { sessionError(e); }
                   });
               return;
             }
@@ -1430,6 +1437,16 @@ public final class StreamActivity extends Activity
     if (engine != null) engine.microphone(enabled);
   }
 
+  private void forgetAbandonedQueue() {
+    abandonedQueue=false; seat=null;
+    getIntent().removeExtra("resumeId"); getIntent().removeExtra("resumeBase");
+  }
+  private void sessionError(Throwable failure) {
+    ui.post(()-> { if(closed)return;
+      if(failure instanceof SessionClient.QueueAbandoned)abandonedQueue=true;
+      error(Diagnostics.failure(failure)); });
+  }
+
   @Override
   public void error(String message) {
     ui.post(
@@ -1455,8 +1472,9 @@ public final class StreamActivity extends Activity
                     if (!playing) signalingPeer.reset();
                     resetTransport();
                     failed = false;
-                    pollErrors = 0;
-                    if (seat != null) {
+                    pollErrors=0;
+                    if(abandonedQueue) { forgetAbandonedQueue(); launch(true); return; }
+                    if(seat!=null) {
                       SessionClient.Seat previous = seat;
                       network.execute(
                           () -> {
@@ -1466,9 +1484,7 @@ public final class StreamActivity extends Activity
                                   () -> {
                                     if (!closed) updateSeat(fresh);
                                   });
-                            } catch (Exception e) {
-                              error(e.getMessage());
-                            }
+                            } catch(Exception e) { sessionError(e); }
                           });
                     } else launch(true);
                   })
@@ -1478,7 +1494,9 @@ public final class StreamActivity extends Activity
                     android.content.ClipboardManager clipboard =
                         (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
                     clipboard.setPrimaryClip(
-                        ClipData.newPlainText("BGFN diagnostico", diagnostic(message)));
+                        ClipData.newPlainText("BGFN diagnostico", diagnostic(message)
+                            + "\n" + sessions.routeHistory()
+                            + (signaling == null ? "" : "\n" + signaling.wireHistory())));
                     failed = false;
                     error(message);
                   })
@@ -1509,7 +1527,8 @@ public final class StreamActivity extends Activity
         + " · appId="
         + Diagnostics.safe(getIntent().getStringExtra("variant"))
         + "\n"
-        + Diagnostics.safe(message == null ? l.t("unavailable") : message);
+        + Diagnostics.safe(message == null ? l.t("unavailable") : message)
+        + "\n" + sessions.routeSummary();
   }
 
   /** Every asynchronous renderer callback belongs to one transport, never the next retry. */
@@ -1559,6 +1578,9 @@ public final class StreamActivity extends Activity
   private void resetTransport() {
     stopVirtualMouse();
     transportGeneration++;
+    // A new PeerConnection has no previous SDP/ACK state. It needs a fresh signaling peer,
+    // even when the CloudMatch session remains active and is being resumed.
+    signalingPeer.reset();
     padChanges.reset();
     controlsSuspended = false;
     ui.removeCallbacks(pollSeat);

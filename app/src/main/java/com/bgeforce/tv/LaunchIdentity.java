@@ -5,7 +5,6 @@ import okhttp3.Request;
 /** Allocation identity and local renderer are separate; every profile still requests WebRTC. */
 enum LaunchIdentity {
   NVIDIA_BROWSER("browser", false, "BROWSER", "WEBRTC", "ANDROID", "PHONE", false),
-  NVIDIA_NATIVE("windows", true, "NATIVE", "NVIDIA-CLASSIC", "WINDOWS", "DESKTOP", true),
   ALLIANCE_NATIVE("windows", true, "NATIVE", "NVIDIA-CLASSIC", "WINDOWS", "DESKTOP", true);
 
   static final String BROWSER_UA =
@@ -33,7 +32,9 @@ enum LaunchIdentity {
 
   static LaunchIdentity select(String broker, String renderer) {
     if (!SessionClient.isNvidia(broker)) return ALLIANCE_NATIVE;
-    return "native".equals(renderer) ? NVIDIA_NATIVE : NVIDIA_BROWSER;
+    // Both local engines implement WebRTC. MediaCodec output does not implement the
+    // NVIDIA-CLASSIC/NVST session transport, so it must not select that allocation class.
+    return NVIDIA_BROWSER;
   }
 
   void apply(Request.Builder request) {

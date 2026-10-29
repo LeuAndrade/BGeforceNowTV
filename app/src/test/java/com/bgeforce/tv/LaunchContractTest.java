@@ -35,7 +35,7 @@ public class LaunchContractTest {
   }
 
   @Test
-  public void nativeNvidiaRequestHasAgeAndConsistentDesktopAllocation() throws Exception {
+  public void nativeRendererUsesTheWebRtcAllocationWithTheRealAge() throws Exception {
     AtomicReference<JSONObject> body = new AtomicReference<>();
     Api api =
         SessionFlowTest.api(
@@ -43,10 +43,10 @@ public class LaunchContractTest {
             Collections.singletonMap("fps", 60),
             chain -> {
               Request request = chain.request();
-              assertEquals("NATIVE", request.header("nv-client-type"));
-              assertEquals("NVIDIA-CLASSIC", request.header("nv-client-streamer"));
-              assertEquals("WINDOWS", request.header("nv-device-os"));
-              assertEquals("DESKTOP", request.header("nv-device-type"));
+              assertEquals("BROWSER", request.header("nv-client-type"));
+              assertEquals("WEBRTC", request.header("nv-client-streamer"));
+              assertEquals("ANDROID", request.header("nv-device-os"));
+              assertEquals("PHONE", request.header("nv-device-type"));
               Buffer buffer = new Buffer();
               request.body().writeTo(buffer);
               body.set(Json.obj(Json.parse(buffer.readUtf8()), "sessionRequestData"));
@@ -55,7 +55,7 @@ public class LaunchContractTest {
     Game game = SessionFlowTest.game();
     new SessionClient(api).create(game, game.selected());
     JSONObject data = body.get();
-    assertEquals("windows", data.getString("clientPlatformName"));
+    assertEquals("browser", data.getString("clientPlatformName"));
     assertTrue(data.get("userAge") instanceof Integer);
     assertEquals(37, data.getInt("userAge"));
     assertEquals(1, data.getInt("streamerVersion"));
@@ -63,10 +63,10 @@ public class LaunchContractTest {
     assertEquals("1.0", data.getString("sdkVersion"));
     assertFalse(data.getBoolean("secureRTSPSupported"));
     JSONObject monitor = data.getJSONArray("clientRequestMonitorSettings").getJSONObject(0);
-    assertEquals(0, monitor.getInt("monitorId"));
-    assertEquals(0, monitor.getInt("positionX"));
-    assertEquals(0, monitor.getInt("positionY"));
-    assertEquals(100, monitor.getInt("dpi"));
+    assertFalse(monitor.has("monitorId"));
+    assertFalse(monitor.has("positionX"));
+    assertFalse(monitor.has("positionY"));
+    assertEquals(0, monitor.getInt("dpi"));
     assertEquals(1280, monitor.getInt("widthInPixels"));
     assertEquals(720, monitor.getInt("heightInPixels"));
     assertEquals(60, monitor.getInt("framesPerSecond"));
@@ -82,7 +82,7 @@ public class LaunchContractTest {
 
   @Test
   public void rendererMatrixKeepsProviderNativeRequirement() {
-    assertEquals(LaunchIdentity.NVIDIA_NATIVE, LaunchIdentity.select(NVIDIA, "native"));
+    assertEquals(LaunchIdentity.NVIDIA_BROWSER, LaunchIdentity.select(NVIDIA, "native"));
     assertEquals(LaunchIdentity.NVIDIA_BROWSER, LaunchIdentity.select(NVIDIA, "webview"));
     assertEquals(LaunchIdentity.ALLIANCE_NATIVE, LaunchIdentity.select(PARTNER, "native"));
     assertEquals(LaunchIdentity.ALLIANCE_NATIVE, LaunchIdentity.select(PARTNER, "webview"));
@@ -112,7 +112,7 @@ public class LaunchContractTest {
                 } catch (JSONException error) {
                   throw new IOException(error);
                 }
-              } else assertEquals("assigned.gfn.nvidia.com", request.url().host());
+              } else assertEquals("assigned.gfn.nvidia.com",request.url().host());
               return SessionFlowTest.response(request, 200, payload);
             });
     Game game = SessionFlowTest.game();

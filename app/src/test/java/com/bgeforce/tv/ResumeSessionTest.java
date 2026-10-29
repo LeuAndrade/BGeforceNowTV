@@ -345,14 +345,15 @@ public class ResumeSessionTest {
             .dns(host -> Collections.singletonList(InetAddress.getByName("203.0.113.20")))
             .build();
     SessionClient.Seat seat = SessionClient.parse(payload(raw(3, "live", "12345")), BROKER);
-    seat.raw.put("connectionInfo", Json.a(Json.o("usage", 14, "ip", "203.0.113.8")));
-    OkHttpClient route = SessionRoute.claim(normal, seat, BROKER);
+    seat.raw.put("connectionInfo", Json.a(Json.o("usage", 14, "ip", "203.0.113.8",
+        "resourcePath", "wss://game.nvidiagrid.net/nvst/")));
+    OkHttpClient route = SessionRoute.claim(normal, seat, GAME);
     assertNotSame(normal, route);
     assertNotSame(normal.connectionPool(), route.connectionPool());
     assertSame(normal.sslSocketFactory(), route.sslSocketFactory());
     assertSame(normal.hostnameVerifier(), route.hostnameVerifier());
     assertEquals(
-        "203.0.113.8", route.dns().lookup(HttpUrl.get(BROKER).host()).get(0).getHostAddress());
+        "203.0.113.8", route.dns().lookup(HttpUrl.get(GAME).host()).get(0).getHostAddress());
     assertEquals(
         "203.0.113.20", route.dns().lookup("other.nvidiagrid.net").get(0).getHostAddress());
   }

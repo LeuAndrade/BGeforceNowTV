@@ -13,7 +13,7 @@ final class Diagnostics {
         text.replaceAll("(?i)(Bearer|GFNJWT)\\s+[^\\s,;]+", "$1 [oculto]")
             .replaceAll("(?i)(x-nv-sessionid\\.)[a-z0-9-]+", "$1[oculto]")
             .replaceAll(
-                "[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}", "[token oculto]")
+                "(?<![A-Za-z0-9_.-])[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}(?![A-Za-z0-9_.-])", "[token oculto]")
             .replaceAll(
                 "(?i)\\b(access_token|id_token|refresh_token|client_token|code|sessionId|pairing_id)[\\s\"'=:/]+[^\\s,;&\"}]+",
                 "$1=[oculto]")
